@@ -806,39 +806,38 @@ function validateAndUpdateObjectives(){
  * Ensure that there are enough KI Spots to support added KIs
  */
 function validateLogicTweaks(){
-    const addKiNames = ['restore_johnny_race', 'restore_tools', 'epoch_fail']
+    // chronosanity always has enough spots
+    if ($('#id_chronosanity').prop('checked')) {
+      return true;
+    }
+
+    const addKiNames = ['restore_johnny_race', 'restore_tools', 'epoch_fail'];
     const addSpotNames = ['add_bekkler_spot', 'add_ozzie_spot',
                           'add_racelog_spot', 'vanilla_robo_ribbon',
-                          'add_cyrus_spot']
+                          'add_cyrus_spot'];
 
-    var numKIs = 0
-    for(var i=0; i<addKiNames.length; i++){
-        const name = addKiNames[i]
-        const id = 'id_'+name
+    let numKIs = addKiNames.filter(
+      (ki) => $('#id_' + ki).prop('checked')
+    ).length;
 
-        const isChecked = document.getElementById(id).checked
-        if (isChecked){numKIs++}
+    let numSpots = addSpotNames.filter(
+      (spot) => $('#id_' + spot).prop('checked')
+    ).length;
 
-    }
-
-    var numSpots = 0
-    for(var i=0; i<addSpotNames.length; i++){
-        const name = addSpotNames[i]
-        const id = 'id_'+name
-
-        const isChecked = document.getElementById(id).checked
-        if (isChecked){numSpots++}
-    }
+    // some modes have extra spots
+    let game_mode = $('#id_game_mode').val();
+    if (game_mode == 'legacy_of_cyrus') { numSpots++; }
+    else if (game_mode == 'ice_age') { numSpots += 2; }
 
     // There can be one more KI than spot because we just erase Jerky
     if (numKIs-1 > numSpots){
         document.getElementById("logicTweakError").innerHTML =
-            "Select Additional Key Item Spots"
+            "Select Additional Key Item Spots";
         $('a[href="#options-extra"]').tab('show');
-        return false
+        return false;
     }
 
-    document.getElementById("logicTweakError").innerHTML = ""
+    document.getElementById("logicTweakError").innerHTML = "";
     return true
 
 }
