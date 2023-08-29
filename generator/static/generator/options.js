@@ -824,6 +824,12 @@ function validateLogicTweaks(){
       (spot) => $('#id_' + spot).prop('checked')
     ).length;
 
+    // Rocksanity adds 5 KIs but only 4 spots
+    if ($('#id_rocksanity').prop('checked')) {
+      numKIs += 5;
+      numSpots += 4;
+    }
+
     // some modes have extra spots
     let game_mode = $('#id_game_mode').val();
     if (game_mode == 'legacy_of_cyrus') { numSpots++; }
