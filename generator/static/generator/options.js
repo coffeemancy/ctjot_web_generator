@@ -3,13 +3,17 @@
  * the game options, including preset and validation functions.
  */
 
+const charIdentities = ['Crono', 'Marle', 'Lucca', 'Robo', 'Frog', 'Ayla', 'Magus'];
+const charModels = ['0', '1', '2', '3', '4', '5', '6'];
+
 /*
  * Initialize some UI settings when page (re-)loaded.
  */
 function initAll() {
-  let options = ['duplicate_characters', 'boss_rando', 'mystery_seed', 'bucket_list'];
+  let options = ['char_rando', 'boss_rando', 'mystery_seed', 'bucket_list'];
   options.forEach((option) => toggleOptions(option));
   restrictFlags();
+  disableDuplicateTechs();
 }
 $(document).ready(initAll);
 
@@ -36,7 +40,7 @@ function resetAll() {
   $('#id_tab_treasures').prop('checked', false).change();
   $('#id_shop_prices').val('normal');
   $('#id_tech_rando').val('normal');
-  $('#id_duplicate_characters').prop('checked', false).change();
+  $('#id_char_rando').prop('checked', false).change();
   $('#id_healing_item_rando').prop('checked', false).change();
   $('#id_gear_rando').prop('checked', false).change();
   $('#id_mystery_seed').prop('checked', false).change();
@@ -51,9 +55,13 @@ function resetAll() {
   $('#id_speed_tab_min').val(1).change();
   $('#id_speed_tab_max').val(1).change();
 
-  // Duplicate Characters options
+  // Character Rando options
+  $('#id_duplicate_characters').prop('checked', false).change();
   $('#id_duplicate_duals').prop('checked', false).change();
-  dcCheckAll();
+  $('#id_duplicate_duals').addClass('disabled');
+  $('#id_duplicate_duals').prop('disabled', true).change();
+
+  rcCheckAll();
 
   // Boss Rando options
   $('#id_legacy_boss_placement').prop('checked', false).change();
@@ -72,6 +80,18 @@ function resetAll() {
   $('#id_bucket_list').prop('checked', false).change();
   $('#id_rocksanity').prop('checked', false).change();
   $('#id_tech_damage_rando').prop('checked', false).change();
+  $('#id_unlocked_skyways').prop('checked', false).change();
+  $('#id_restore_johnny_race').prop('checked', false).change();
+  $('#id_restore_tools').prop('checked', false).change();
+  $('#id_add_bekkler_spot').prop('checked', false).change();
+  $('#id_add_ozzie_spot').prop('checked', false).change();
+  $('#id_add_racelog_spot').prop('checked', false).change();
+  $('#id_vanilla_robo_ribbon').prop('checked', false).change();
+  $('#id_add_cyrus_spot').prop('checked', false).change();
+  $('#id_remove_black_omen_spot').prop('checked', false).change();
+  $('#id_add_sunkeep_spot').prop('checked', false).change();
+  $('#id_split_arris_dome').prop('checked', false).change();
+  $('#id_vanilla_desert').prop('checked', false).change();
 
   // Mystery Seed options
   // game modes
@@ -214,27 +234,21 @@ function presetLegacyOfCyrus() {
  }
 
 /*
- * Check all of the duplicate character boxes.
+ * Check all of the character rando assignment boxes.
  */
-function dcCheckAll() {
-  let characters = ['Crono', 'Marle', 'Lucca', 'Robo', 'Frog', 'Ayla', 'Magus'];
-  for (var charId = 0; charId < characters.length; charId++) {
-    for (var i = 0; i < 7; i++) {
-      $('#dc_' + characters[charId] + i.toString()).prop('checked', true);
-    }
-  }
+function rcCheckAll() {
+  charIdentities.forEach((identity) => {
+    charModels.forEach((model) => $('#rc_' + identity + model).prop('checked', true));
+  });
 }
 
 /*
- * Uncheck all of the duplicate character boxes.
+ * Uncheck all of the character rando assignment boxes.
  */
-function dcUncheckAll() {
-  let characters = ['Crono', 'Marle', 'Lucca', 'Robo', 'Frog', 'Ayla', 'Magus'];
-  for (var charId = 0; charId < characters.length; charId++) {
-    for (var i = 0; i < 7; i++) {
-      $('#dc_' + characters[charId] + i.toString()).prop('checked', false);
-    }
-  }
+function rcUncheckAll() {
+  charIdentities.forEach((identity) => {
+    charModels.forEach((model) => $('#rc_' + identity + model).prop('checked', false));
+  });
 }
 
 /*
@@ -244,45 +258,54 @@ function dcUncheckAll() {
  *   0x17 - The character can become:
  *      Crono, Marle, Lucca, or Frog.
  */
-function encodeDuplicateCharacterChoices() {
+function encodeCharRandoChoices() {
   var encodedString = "";
-  let characters = ['Crono', 'Marle', 'Lucca', 'Robo', 'Frog', 'Ayla', 'Magus'];
-  for (var charId = 0; charId < characters.length; charId++) {
-    var currentCharValue = 0;
-    for (var i = 0; i < 7; i++) {
-      if ($('#dc_' + characters[charId] + i.toString()).prop('checked')) {
+  charIdentities.forEach((identity) => {
+    let currentCharValue = 0;
+    charModels.forEach((model, i) => {
+      if ($('#rc_' + identity + model).prop('checked')) {
         currentCharValue = currentCharValue + (1 << i);
       }
-    }
-    
+    });
+
     if ((currentCharValue & 0xFF) < 0x10) {
       // Pad the string with a zero if needed so that the
       // final string is 14 characters.
       encodedString += "0";
     }
     encodedString += (currentCharValue & 0xFF).toString(16);
-  }
-  
-  $('#id_duplicate_char_assignments').val(encodedString);
+  });
+  $('#id_char_rando_assignments').val(encodedString);
 }
 
 /*
- * Validate that the user's choices for duplicate characters are valid.
- * Each character needs to have at least one character they can turn into.
+ * Validate that the user's choices for character rando are valid.
+ * Each character identity needs to have at least one character model they can turn into.
+ * Unless duplicate characters is used, also ensure that each model has at
+ * least one character identity they can use.
  */
-function validateDupCharChoices() {
-  let characters = ['Crono', 'Marle', 'Lucca', 'Robo', 'Frog', 'Ayla', 'Magus'];
-  for (var charId = 0; charId < characters.length; charId++) {
-    var selectionFound = false;
-    for (var i = 0; i < 7; i++) {
-      if ($('#dc_' + characters[charId] + i.toString()).prop('checked')) {
-        selectionFound = true;
-        break;
-      }
-    }
-    if (!selectionFound) {
-      $('#character_selection_error').html("Each row must have at least one selection.");
-      $('a[href="#options-dc"]').tab('show');
+function validateCharRandoChoices() {
+  // ensure each character identity has at least one character model associated
+  modelMissing = charIdentities.some(identity => {
+    return !charModels.some(model => $('#rc_' + identity + model).prop('checked'));
+  });
+  if (modelMissing) {
+    $('#character_selection_error').html("Each identity (row) must have at least one model (column) selected.");
+    $('a[href="#options-rc"]').tab('show');
+    $('#character_selection_matrix').collapse('show');
+    return false;
+  }
+
+  let duplicateCharsChecked = $('#id_duplicate_characters').prop('checked');
+  if (!duplicateCharsChecked) {
+    // ensure each character model has at least one character identity associated
+    identityMissing = charModels.some(model => {
+      return !charIdentities.some(identity => $('#rc_' + identity + model).prop('checked'));
+    });
+    if (identityMissing) {
+      $('#character_selection_error').html("Each model (column) must have at least one identity (row) selected.");
+      $('a[href="#options-rc"]').tab('show');
+      $('#character_selection_matrix').collapse('show');
       return false;
     }
   }
@@ -291,15 +314,75 @@ function validateDupCharChoices() {
 }
 
 /*
+ * Disable duplicate techs if duplicate characters is disabled.
+ */
+function disableDuplicateTechs() {
+  if ($('#id_duplicate_characters').prop('checked')) {
+    $('#id_duplicate_duals').removeClass('disabled');
+    $('#id_duplicate_duals').prop('disabled', false).change();
+  } else {
+    $('#id_duplicate_duals').prop('checked', false).change();
+    $('#id_duplicate_duals').addClass('disabled');
+    $('#id_duplicate_duals').prop('disabled', true).change();
+  }
+}
+
+/*
+ * Toggle flags related to Rocksanity when rocksanity is toggled.
+ *
+ * Provides visual clues to users for things that fix_flag_conflicts in randomizer
+ * already does (enable Unlocked Skyways, effectively Remove Black Omen spot
+ * when using Ice Age or Legacy of Cyrus).
+ */
+var priorUnlockedSkyways = $('#id_unlocked_skyways').prop('checked');
+var priorRemoveBlackOmenSpot = $('#id_remove_black_omen_spot').prop('checked');
+function toggleRocksanityRelated() {
+  let game_mode = $('#id_game_mode').val();
+
+  if ($('#id_rocksanity').prop('checked')) {
+    priorUnlockedSkyways = $('#id_unlocked_skyways').prop('checked');
+    priorRemoveBlackOmenSpot = $('#id_remove_black_omen_spot').prop('checked');
+    $('#id_unlocked_skyways').prop('checked', true).change();
+
+    // visually indicate that some modes effectively remove black omen spot
+    if ((game_mode == 'ice_age') || (game_mode == 'legacy_of_cyrus')) {
+      $('#id_remove_black_omen_spot').prop('checked', true).change();
+    }
+  } else {
+    // check to prevent infinite recursion
+    if ($('#id_unlocked_skyways').prop('checked') != priorUnlockedSkyways) {
+      $('#id_unlocked_skyways').prop('checked', priorUnlockedSkyways).change();
+    }
+    $('#id_remove_black_omen_spot').prop('checked', priorRemoveBlackOmenSpot).change();
+  }
+}
+
+/*
+ * Toggle flags related to Unlocked Skyways when it is toggled.
+ *
+ * Provides visual cluse to users for related/dependencies when Unlocked
+ * Skyways is toggled (e.g. turn off Rocksanity if Unlocked Skyways is removed).
+ */
+function toggleUnlockedSkywaysRelated() {
+  if (!$('#id_unlocked_skyways').prop('checked')) {
+    // check to prevent infinite recursion
+    if ($('#id_rocksanity').prop('checked')) {
+      priorUnlockedSkyways = false;
+      $('#id_rocksanity').prop('checked', false).change();
+    }
+  }
+}
+
+/*
  * Pre-submit preparation for the form.
- *   - Validate duplicate character choices
- *   - Populate the hidden field with duplicate character information
+ *   - Validate character rando choices
+ *   - Populate the hidden field with character rando information
  */
 function prepareForm() {
-  if (!validateDupCharChoices()) {
+  if (!validateCharRandoChoices()) {
     return false;
   }
-  encodeDuplicateCharacterChoices();
+  encodeCharRandoChoices();
 
   if (!validateLogicTweaks())
       return false;
@@ -349,7 +432,7 @@ function updateMysterySettings() {
     'mystery_tech_order_normal', 'mystery_tech_order_full_random', 'mystery_tech_order_balanced_random',
     'mystery_shop_prices_normal', 'mystery_shop_prices_random', 'mystery_shop_prices_mostly_random', 'mystery_shop_prices_free'];
   var id_list_percentage = ['mystery_tab_treasures', 'mystery_unlock_magic', 'mystery_bucket_list', 'mystery_chronosanity',
-    'mystery_boss_rando', 'mystery_boss_scale', 'mystery_locked_characters', 'mystery_duplicate_characters',
+    'mystery_boss_rando', 'mystery_boss_scale', 'mystery_locked_characters', 'mystery_char_rando', 'mystery_duplicate_characters',
     'mystery_epoch_fail', 'mystery_gear_rando', 'mystery_heal_rando'];
 
   for (const id of id_list_relative) {
@@ -757,40 +840,48 @@ function validateAndUpdateObjectives(){
  * Ensure that there are enough KI Spots to support added KIs
  */
 function validateLogicTweaks(){
-    const addKiNames = ['restore_johnny_race', 'restore_tools', 'epoch_fail']
+    // chronosanity always has enough spots
+    if ($('#id_chronosanity').prop('checked')) {
+      return true;
+    }
+
+    const addKiNames = ['restore_johnny_race', 'restore_tools', 'epoch_fail'];
     const addSpotNames = ['add_bekkler_spot', 'add_ozzie_spot',
                           'add_racelog_spot', 'vanilla_robo_ribbon',
-                          'add_cyrus_spot']
+                          'add_cyrus_spot'];
+    let game_mode = $('#id_game_mode').val();
 
-    var numKIs = 0
-    for(var i=0; i<addKiNames.length; i++){
-        const name = addKiNames[i]
-        const id = 'id_'+name
+    let numKIs = addKiNames.filter((ki) => $('#id_' + ki).prop('checked')).length;
 
-        const isChecked = document.getElementById(id).checked
-        if (isChecked){numKIs++}
+    let numSpots = addSpotNames.filter((spot) => $('#id_' + spot).prop('checked')).length;
 
+    // Rocksanity adds 5 KIs, 4-5 spots depending on mode
+    if ($('#id_rocksanity').prop('checked')) {
+      numKIs += 5;
+      let inaccessible = game_mode == 'ice_age' || game_mode == 'legacy_of_cyrus';
+      if (inaccessible || $('#id_remove_black_omen_spot').prop('checked')) { numSpots += 4; }
+      else { numSpots += 5; }
     }
 
-    var numSpots = 0
-    for(var i=0; i<addSpotNames.length; i++){
-        const name = addSpotNames[i]
-        const id = 'id_'+name
+    // some modes have extra spots
+    if (game_mode == 'legacy_of_cyrus') { numSpots++; }
+    else if (game_mode == 'ice_age') { numSpots += 2; }
 
-        const isChecked = document.getElementById(id).checked
-        if (isChecked){numSpots++}
-    }
+    // there can be more KI than spots because can erase Jerky
+    // and fix_flag_conflicts can add Robo Ribbon or remove Epoch Fail
+    allowedExtras = 1;
+    if (!$('#id_vanilla_robo_ribbon').prop('checked')) { allowedExtras++; }
+    if ($('#id_epoch_fail').prop('checked')) { allowedExtras++; }
 
-    // There can be one more KI than spot because we just erase Jerky
-    if (numKIs-1 > numSpots){
+    if (numKIs > numSpots + allowedExtras){
         document.getElementById("logicTweakError").innerHTML =
-            "Select Additional Key Item Spots"
+            "Select Additional Key Item Spots";
         $('a[href="#options-extra"]').tab('show');
-        return false
+        return false;
     }
 
-    document.getElementById("logicTweakError").innerHTML = ""
-    return true
+    document.getElementById("logicTweakError").innerHTML = "";
+    return true;
 
 }
 
@@ -798,13 +889,12 @@ const forceOff = {
     "standard": [],
     "lost_worlds": ["boss_scaling", "bucket_list", "epoch_fail",
                     "add_bekkler_spot", "add_cyrus_spot", "add_ozzie_spot",
-                    "add_racelog_spot", "add_sunkeep_spot",
+                    "add_racelog_spot", "add_sunkeep_spot", "remove_black_omen_spot",
                     "restore_johnny_race", "split_arris_dome",
                     "restore_tools", "unlocked_skyways",
                     "vanilla_desert", "vanilla_robo_ribbon"],
-    "ice_age": ["zeal", "boss_scaling", "bucket_list"],
-    "legacy_of_cyrus": ["zeal", "boss_scale", "bucket_list",
-                        "add_ozzie_spot", "add_cyrus_spot",
+    "ice_age": ["zeal", "boss_scaling", "bucket_list", "add_bekkler_spot"],
+    "legacy_of_cyrus": ["zeal", "boss_scale", "bucket_list", "add_ozzie_spot",
                         "add_sunkeep_spot", "restore_tools",
                         "restore_johnny_race", "split_arris_dome",
                         "add_racelog_spot", "add_bekkler_spot"],

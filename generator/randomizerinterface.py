@@ -1,8 +1,10 @@
 # Python types
 from __future__ import annotations
+import copy
 import io
 import os.path
 import random
+import re
 import sys
 import datetime
 
@@ -17,6 +19,7 @@ sys.path.append(os.path.join(conf.BASE_DIR, 'jetsoftime', 'sourcefiles'))
 # Randomizer types
 import ctenums
 import bossrandotypes as rotypes
+import logicwriters as logicwriter
 import randoconfig
 import randomizer
 import randosettings as rset
@@ -296,11 +299,12 @@ class RandomizerInterface:
             'unlocked_magic': GF.UNLOCKED_MAGIC,
             'tab_treasures': GF.TAB_TREASURES,
             'chronosanity': GF.CHRONOSANITY,
-            'duplicate_characters': GF.DUPLICATE_CHARS,
+            'char_rando': GF.CHAR_RANDO,
             'healing_item_rando': GF.HEALING_ITEM_RANDO,
             'gear_rando': GF.GEAR_RANDO,
             'mystery_seed': GF.MYSTERY,
             'epoch_fail': GF.EPOCH_FAIL,
+            'duplicate_characters': GF.DUPLICATE_CHARS,
             'duplicate_duals': GF.DUPLICATE_TECHS,
             # This should get moved to ROSettings.
             'boss_spot_hp': GF.BOSS_SPOT_HP,
@@ -313,6 +317,7 @@ class RandomizerInterface:
             'add_ozzie_spot': GF.ADD_OZZIE_SPOT,
             'restore_johnny_race': GF.RESTORE_JOHNNY_RACE,
             'add_racelog_spot': GF.ADD_RACELOG_SPOT,
+            'remove_black_omen_spot': GF.REMOVE_BLACK_OMEN_SPOT,
             'split_arris_dome': GF.SPLIT_ARRIS_DOME,
             'vanilla_robo_ribbon': GF.VANILLA_ROBO_RIBBON,
             'vanilla_desert': GF.VANILLA_DESERT,
@@ -334,16 +339,18 @@ class RandomizerInterface:
             if form.cleaned_data[name]:
                 settings.gameflags |= flag
 
-        # Duplicate characters
+        settings.initial_flags = copy.deepcopy(settings.gameflags)
+
+        # Character rando
         char_choices = []
-        duplicate_char_assignments = \
-            form.cleaned_data['duplicate_char_assignments']
-        # duplicate character assignments comes in as a stringified hex number.
+        char_rando_assignments = form.cleaned_data['char_rando_assignments']
+
+        # character rando assignments comes in as a stringified hex number.
         # Decode the hex string into the char_choices list.
         # Loop through the characters
         for i in range(7):
             char_choices.append([])
-            choices = int(duplicate_char_assignments[(i * 2):(i * 2) + 2], 16)
+            choices = int(char_rando_assignments[(i * 2):(i * 2) + 2], 16)
             # Loop through the assignments for the current character
             for j in range(7):
                 if choices & (1 << j) > 0:
@@ -437,6 +444,7 @@ class RandomizerInterface:
             rset.GameFlags.BOSS_RANDO: form.cleaned_data['mystery_boss_rando']/100,
             rset.GameFlags.BOSS_SCALE: form.cleaned_data['mystery_boss_scale']/100,
             rset.GameFlags.LOCKED_CHARS: form.cleaned_data['mystery_locked_characters']/100,
+            rset.GameFlags.CHAR_RANDO: form.cleaned_data['mystery_char_rando']/100,
             rset.GameFlags.DUPLICATE_CHARS: form.cleaned_data['mystery_duplicate_characters']/100,
             rset.GameFlags.EPOCH_FAIL: form.cleaned_data['mystery_epoch_fail']/100,
             rset.GameFlags.GEAR_RANDO: form.cleaned_data['mystery_gear_rando']/100,
@@ -501,7 +509,8 @@ class RandomizerInterface:
             'characters': [],
             'key_items': [],
             'bosses': [],
-            'objectives': []
+            'objectives': [],
+            'spheres': []
         }
 
         if rset.GameFlags.BUCKET_LIST in settings.gameflags:
@@ -539,6 +548,12 @@ class RandomizerInterface:
             else:
                 boss_str = str(config.boss_assign_dict[location])
             spoiler_log['bosses'].append({'location': str(location), 'boss': boss_str})
+
+        # Sphere data
+        spheres = logicwriter.get_proof_string_from_settings_config(settings, config)
+        rgx = re.compile(r'((?P<sphere>GO|(\d?)):\s*)?(?P<desc>.+)')
+        for line in spheres.splitlines():
+            spoiler_log['spheres'].append(rgx.search(line).groupdict())
 
         return spoiler_log
     # End get_web_spoiler_log
