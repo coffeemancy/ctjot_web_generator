@@ -88,6 +88,7 @@ function resetAll() {
   $('#id_add_racelog_spot').prop('checked', false).change();
   $('#id_vanilla_robo_ribbon').prop('checked', false).change();
   $('#id_add_cyrus_spot').prop('checked', false).change();
+  $('#id_remove_black_omen_spot').prop('checked', false).change();
   $('#id_add_sunkeep_spot').prop('checked', false).change();
   $('#id_split_arris_dome').prop('checked', false).change();
   $('#id_vanilla_desert').prop('checked', false).change();
@@ -327,15 +328,48 @@ function disableDuplicateTechs() {
 }
 
 /*
- * Enable unlocked skyways when rocksanity is enabled.
+ * Toggle flags related to Rocksanity when rocksanity is toggled.
+ *
+ * Provides visual clues to users for things that fix_flag_conflicts in randomizer
+ * already does (enable Unlocked Skyways, effectively Remove Black Omen spot
+ * when using Ice Age or Legacy of Cyrus).
  */
 var priorUnlockedSkyways = $('#id_unlocked_skyways').prop('checked');
-function enableUnlockedSkyways() {
+var priorRemoveBlackOmenSpot = $('#id_remove_black_omen_spot').prop('checked');
+function toggleRocksanityRelated() {
+  let game_mode = $('#id_game_mode').val();
+
   if ($('#id_rocksanity').prop('checked')) {
     priorUnlockedSkyways = $('#id_unlocked_skyways').prop('checked');
+    priorRemoveBlackOmenSpot = $('#id_remove_black_omen_spot').prop('checked');
     $('#id_unlocked_skyways').prop('checked', true).change();
+
+    // visually indicate that some modes effectively remove black omen spot
+    if ((game_mode == 'ice_age') || (game_mode == 'legacy_of_cyrus')) {
+      $('#id_remove_black_omen_spot').prop('checked', true).change();
+    }
   } else {
-    $('#id_unlocked_skyways').prop('checked', priorUnlockedSkyways).change();
+    // check to prevent infinite recursion
+    if ($('#id_unlocked_skyways').prop('checked') != priorUnlockedSkyways) {
+      $('#id_unlocked_skyways').prop('checked', priorUnlockedSkyways).change();
+    }
+    $('#id_remove_black_omen_spot').prop('checked', priorRemoveBlackOmenSpot).change();
+  }
+}
+
+/*
+ * Toggle flags related to Unlocked Skyways when it is toggled.
+ *
+ * Provides visual cluse to users for related/dependencies when Unlocked
+ * Skyways is toggled (e.g. turn off Rocksanity if Unlocked Skyways is removed).
+ */
+function toggleUnlockedSkywaysRelated() {
+  if (!$('#id_unlocked_skyways').prop('checked')) {
+    // check to prevent infinite recursion
+    if ($('#id_rocksanity').prop('checked')) {
+      priorUnlockedSkyways = false;
+      $('#id_rocksanity').prop('checked', false).change();
+    }
   }
 }
 
@@ -815,28 +849,31 @@ function validateLogicTweaks(){
     const addSpotNames = ['add_bekkler_spot', 'add_ozzie_spot',
                           'add_racelog_spot', 'vanilla_robo_ribbon',
                           'add_cyrus_spot'];
+    let game_mode = $('#id_game_mode').val();
 
-    let numKIs = addKiNames.filter(
-      (ki) => $('#id_' + ki).prop('checked')
-    ).length;
+    let numKIs = addKiNames.filter((ki) => $('#id_' + ki).prop('checked')).length;
 
-    let numSpots = addSpotNames.filter(
-      (spot) => $('#id_' + spot).prop('checked')
-    ).length;
+    let numSpots = addSpotNames.filter((spot) => $('#id_' + spot).prop('checked')).length;
 
-    // Rocksanity adds 5 KIs but only 4 spots
+    // Rocksanity adds 5 KIs, 4-5 spots depending on mode
     if ($('#id_rocksanity').prop('checked')) {
       numKIs += 5;
-      numSpots += 4;
+      let inaccessible = game_mode == 'ice_age' || game_mode == 'legacy_of_cyrus';
+      if (inaccessible || $('#id_remove_black_omen_spot').prop('checked')) { numSpots += 4; }
+      else { numSpots += 5; }
     }
 
     // some modes have extra spots
-    let game_mode = $('#id_game_mode').val();
     if (game_mode == 'legacy_of_cyrus') { numSpots++; }
     else if (game_mode == 'ice_age') { numSpots += 2; }
 
-    // There can be one more KI than spot because we just erase Jerky
-    if (numKIs-1 > numSpots){
+    // there can be more KI than spots because can erase Jerky
+    // and fix_flag_conflicts can add Robo Ribbon or remove Epoch Fail
+    allowedExtras = 1;
+    if (!$('#id_vanilla_robo_ribbon').prop('checked')) { allowedExtras++; }
+    if ($('#id_epoch_fail').prop('checked')) { allowedExtras++; }
+
+    if (numKIs > numSpots + allowedExtras){
         document.getElementById("logicTweakError").innerHTML =
             "Select Additional Key Item Spots";
         $('a[href="#options-extra"]').tab('show');
@@ -844,7 +881,7 @@ function validateLogicTweaks(){
     }
 
     document.getElementById("logicTweakError").innerHTML = "";
-    return true
+    return true;
 
 }
 
@@ -852,13 +889,12 @@ const forceOff = {
     "standard": [],
     "lost_worlds": ["boss_scaling", "bucket_list", "epoch_fail",
                     "add_bekkler_spot", "add_cyrus_spot", "add_ozzie_spot",
-                    "add_racelog_spot", "add_sunkeep_spot",
+                    "add_racelog_spot", "add_sunkeep_spot", "remove_black_omen_spot",
                     "restore_johnny_race", "split_arris_dome",
                     "restore_tools", "unlocked_skyways",
                     "vanilla_desert", "vanilla_robo_ribbon"],
-    "ice_age": ["zeal", "boss_scaling", "bucket_list"],
-    "legacy_of_cyrus": ["zeal", "boss_scale", "bucket_list",
-                        "add_ozzie_spot", "add_cyrus_spot",
+    "ice_age": ["zeal", "boss_scaling", "bucket_list", "add_bekkler_spot"],
+    "legacy_of_cyrus": ["zeal", "boss_scale", "bucket_list", "add_ozzie_spot",
                         "add_sunkeep_spot", "restore_tools",
                         "restore_johnny_race", "split_arris_dome",
                         "add_racelog_spot", "add_bekkler_spot"],
