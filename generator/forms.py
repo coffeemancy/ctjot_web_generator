@@ -168,3 +168,7 @@ class GenerateForm(forms.Form):
     bucket_objective6 = forms.CharField(required=False)
     bucket_objective7 = forms.CharField(required=False)
     bucket_objective8 = forms.CharField(required=False)
+
+    # presets
+    preset_selection = forms.CharField(max_length=25, required=False)
+    preset_file = forms.FileField(required=False)

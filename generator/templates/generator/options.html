@@ -2,8 +2,16 @@
 
 {% block imports %}
     {% load static %}
-    {{ gameflags_map | json_script:"gameflags-map" }}
+    {{ enums_map | json_script:"enums-map" }}
+    {{ inv_enums_map | json_script:"inv-enums-map" }}
     {{ obhint_map | json_script:"obhint-map" }}
+    <script id="presets-map" type="application/json">
+    {
+      {% for preset_id, entry in presets_map.items %}
+      "{{ preset_id }}": {{ entry.contents | safe }}{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    }
+    </script>
     <script id="settings-defaults" type="application/json">{{ settings_defaults_json | safe }}</script>
     <script src="{% static 'generator/options.js' %}"></script>
     <link rel="stylesheet" href="{% static 'generator/styles.css' %}">

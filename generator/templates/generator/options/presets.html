@@ -1,8 +1,37 @@
       <div class="border border-primary rounded p-2">
-        <button class="btn btn-primary mt-1 mb-1" type="button" onclick="resetAll()">Reset All</button>
-        <button class="btn btn-primary mt-1 mb-1" type="button" onclick="presetRace()">Race</button>
-        <button class="btn btn-primary mt-1 mb-1" type="button" onclick="presetNewPlayer()">New Player</button>
-        <button class="btn btn-primary mt-1 mb-1" type="button" onclick="presetLostWorlds()">Lost Worlds</button>
-        <button class="btn btn-primary mt-1 mb-1" type="button" onclick="presetHard()">Hard</button>
-        <button class="btn btn-primary mt-1 mb-1" type="button" onclick="presetLegacyOfCyrus()">Legacy of Cyrus</button>
+
+        <div class="form-row">
+          <div class="col">
+            <button class="btn btn-primary mt-1 mb-1" type="button" onclick="resetAll()">Reset All</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" onclick="applyPreset(presetsMap['race'])">Race</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" onclick="applyPreset(presetsMap['new_player'])">New Player</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" onclick="applyPreset(presetsMap['lost_worlds'])">Lost Worlds</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" onclick="applyPreset(presetsMap['hard'])">Hard</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" onclick="applyPreset(presetsMap['legacy_of_cyrus'])">Legacy of Cyrus</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_load_preset_btn" onclick="loadSelectedPreset()">Upload Preset</button>
+          </div>
+
+          <div class="w-100"></div>
+
+          <div class="col p-2">
+            <div id="id_preset_metadata"></div>
+          </div>
+
+          <div class="w-100"></div>
+
+          <!-- Preset upload -->
+          <div class="col align-self-end collapse custom-preset-collapse">
+            <div class="input-group mb-2">
+              <div class="input-group-prepend">
+                <div class="input-group-text">Upload Preset</div>
+              </div>
+              <input type="file" accept="application/JSON" class="form-control-file form-control" id="{{form.preset_file.id_for_label}}" name="{{form.preset_file.name}}" onchange="loadSelectedPreset()">
+            </div>
+          </div>
+          <div class="w-100"></div>
+          <div class="col">
+            <div class="bg-danger" id="id_invalid_preset_file"></div>
+          </div>
+        </div>
+
       </div>

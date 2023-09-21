@@ -9,8 +9,10 @@
 function getJsonScriptData(jsonScript) {
   return JSON.parse(document.getElementById(jsonScript).textContent);
 }
-const gameflagsMap = getJsonScriptData('gameflags-map');
+const enumsMap = getJsonScriptData('enums-map');
+const invEnumsMap = getJsonScriptData('inv-enums-map');
 const obhintMap = getJsonScriptData('obhint-map');
+const presetsMap = getJsonScriptData('presets-map');
 const settingsDefaults = getJsonScriptData('settings-defaults');
 
 const charIdentities = ['Crono', 'Marle', 'Lucca', 'Robo', 'Frog', 'Ayla', 'Magus'];
@@ -57,6 +59,9 @@ const mysteryFlagSliders = {
   'mystery_gear_rando': 'gear_rando',
   'mystery_heal_rando': 'healing_item_rando'
 }
+
+/* last loaded preset, just for console debugging */
+var lastPreset = {};
 
 /*
  * Creates a slider with linked text.
@@ -174,21 +179,24 @@ $(document).ready(initOnce);
  * Apply preset values to all form inputs.
  */
 function applyPreset(preset) {
+  // metadata
+  let metadata = "";
+  if (preset.metadata) {
+    if (preset.metadata.desc) { metadata += "<p>" + preset.metadata.desc + "</p>"; }
+    else { metadata += "<p>" + preset.metadata.name + "</p>"; }
+  }
+  document.getElementById('id_preset_metadata').innerHTML = metadata;
+
   // General options
   const gameOption = ((key) => {
-    let missing = settingsDefaults[key].toLowerCase().replace(/\s/g, '_');
+    let missing = invEnumsMap[key][settingsDefaults[key]];
     if(!preset.settings[key]) { return missing; }
-    return preset.settings[key].toLowerCase().replace(/\s/g, '_');
+    return invEnumsMap[key][preset.settings[key]];
   });
   $('#id_game_mode').val(gameOption('game_mode')).change();
   $('#id_enemy_difficulty').val(gameOption('enemy_difficulty')).change();
   $('#id_item_difficulty').val(gameOption('item_difficulty')).change();
-  $('#id_tech_rando').val(
-    (v => {
-      if (v == 'full_random') { return 'fully_random'; }
-      return v;
-    })(gameOption('techorder'))
-  ).change();
+  $('#id_tech_rando').val(gameOption('techorder')).change();
   $('#id_shop_prices').val(gameOption('shopprices')).change();
 
   // Flags
@@ -197,7 +205,7 @@ function applyPreset(preset) {
     if(!preset.settings.gameflags) { return missing; }
     return preset.settings.gameflags.includes(flag);
   });
-  Object.entries(gameflagsMap).forEach(([id, flag]) => {
+  Object.entries(enumsMap.gameflags).forEach(([id, flag]) => {
     $('#id_' + id).prop('checked', hasFlag(flag)).change();
   });
 
@@ -208,7 +216,7 @@ function applyPreset(preset) {
   const tabSetting = ((key) => {
     let missing = settingsDefaults.tab_settings[key];
     if(!preset.settings.tab_settings) { return missing; }
-    return preset.settings.tab_settings[key] || missing;
+    return preset.settings.tab_settings[key] ?? missing;
   });
 
   ['power', 'magic', 'speed'].forEach((tab) => {
@@ -224,7 +232,36 @@ function applyPreset(preset) {
     $('#id_duplicate_duals').prop('disabled', true).change();
   }
 
-  rcCheckAll();
+  // check character choice boxes based on preset
+  if(preset.settings.char_settings && preset.settings.char_settings.choices) {
+    char_choices = preset.settings.char_settings.choices;
+    rcUncheckAll();
+    char_choices.forEach((choices, pc_index) => {
+      let models = [];
+
+      // choices is string, coerce to list
+      if (Object.prototype.toString.call(choices) === "[object String]") {
+        let splits = choices.split(" ");
+        if(splits[0] == "any") { models = charModels }
+        else {
+          let modelChoices = splits.map((choice) => {
+            return charIdentities.findIndex((identity) => identity.toLowerCase() == choice.toLowerCase());
+          }).filter((index) => index > -1).map((index) => charModels[index]);
+
+          if (splits[0] == "not") { models = charModels.filter((model) => !modelChoices.includes(model)) }
+          else { models = modelChoices }
+        }
+      } else { models = choices }
+
+      let identity = charIdentities[pc_index];
+      models.forEach((model) => $('#rc_' + identity + model).prop('checked', true));
+    });
+
+    // make character assignments matrix visible if the preset had some
+    $('#character_selection_matrix').collapse('show');
+  } else {
+    rcCheckAll();
+  }
 
   // Boss Rando options
   $('#id_legacy_boss_placement').prop('checked', false).change();
@@ -234,12 +271,12 @@ function applyPreset(preset) {
     let missing = settingsDefaults.mystery_settings[field][key];
     if(!preset.settings.mystery_settings) { return missing; }
     if(!preset.settings.mystery_settings[field]) { return missing; }
-    return preset.settings.mystery_settings[field][key] || missing;
+    return preset.settings.mystery_settings[field][key] ?? missing;
   });
 
   Object.entries(mysterySliders).forEach(([id, [field, key]]) => setSlider(id, mysterySetting(field, key)));
   Object.entries(mysteryFlagSliders).forEach(([id, key]) => {
-    let value = 100 * mysterySetting('flag_prob_dict', gameflagsMap[key]);
+    let value = 100 * mysterySetting('flag_prob_dict', enumsMap.gameflags[key]);
     setSlider(id, value, '%');
   });
 
@@ -247,7 +284,7 @@ function applyPreset(preset) {
   const bucketSetting = ((key) => {
     let missing = settingsDefaults.bucket_settings[key]
     if(!preset.settings.bucket_settings) { return missing; }
-    return preset.settings.bucket_settings[key] || missing;
+    return preset.settings.bucket_settings[key] ?? missing;
   });
   setSlider('bucket_num_objs', bucketSetting('num_objectives'));
   setSlider('bucket_num_objs_req', bucketSetting('num_objectives_needed'));
@@ -255,8 +292,8 @@ function applyPreset(preset) {
   $('#id_bucket_obj_win_game').prop('checked', bucketSetting('objectives_win')).change();
 
   // read objective hints from preset
-  let hints = bucketSetting('hints') || [];
-  [...Array(8).keys()].forEach((index) => $('#id_obhint_entry' + (index + 1)).val(hints[index] || '').change());
+  let hints = bucketSetting('hints') ?? [];
+  [...Array(8).keys()].forEach((index) => $('#id_obhint_entry' + (index + 1)).val(hints[index] ?? '').change());
 }
 
 /*
@@ -267,123 +304,53 @@ function resetAll() {
   $('a[href="#options-general"]').tab('show');
   initAll();
   applyPreset({'settings': {}});
+  $('.custom-preset-collapse').collapse('hide');
+  document.getElementById('id_load_preset_btn').textContent = 'Upload Preset';
 }
 
 /*
- * Populate the options form with the settings for a standard race seed.
+ * Import preset from uploaded preset JSON.
  */
-function presetRace() {
-  applyPreset(
-    {
-      "settings": {
-        "game_mode": "Standard",
-        "enemy_difficulty": "Normal",
-        "item_difficulty": "Normal",
-        "techorder": "Full random",
-        "shopprices": "Normal",
-        "gameflags": [
-          "GameFlags.FIX_GLITCH",
-          "GameFlags.ZEAL_END",
-          "GameFlags.FAST_PENDANT",
-          "GameFlags.FAST_TABS"
-        ]
-      }
+function importPreset() {
+  let errElem = document.getElementById('id_invalid_preset_file');
+
+  let reader = new FileReader();
+  reader.onload = (event) => {
+    let preset = {};
+
+    try { preset = JSON.parse(event.target.result); }
+    catch (e) {
+      errElem.innerHTML = "<p>Could not parse preset file as JSON:</p>" + e.toString();
+      return;
     }
-  );
+
+    // validate preset file
+    if(!preset.settings) {
+      errElem.innerHTML = "<p>Preset file missing a 'settings' section.</p>";
+      return;
+    }
+    else { errElem.innerHTML = ""; }
+
+    // set lastPreset, just for console debugging, not otherwise used
+    lastPreset = preset;
+    applyPreset(preset);
+  };
+  reader.onerror = () => { errElem.innerHTML = reader.error; }
+
+  let preset_file = document.getElementById('id_preset_file').files[0];
+  reader.readAsText(preset_file);
 }
 
 /*
- * Populate the options form with the settings for a new player seed.
+ * Load preset based on selected value in preset dropdown list.
  */
-function presetNewPlayer() {
-  applyPreset(
-    {
-      "settings": {
-        "game_mode": "Standard",
-        "enemy_difficulty": "Normal",
-        "item_difficulty": "Easy",
-        "techorder": "Full random",
-        "shopprices": "Normal",
-        "gameflags": [
-          "GameFlags.FIX_GLITCH",
-          "GameFlags.ZEAL_END",
-          "GameFlags.FAST_PENDANT",
-          "GameFlags.UNLOCKED_MAGIC",
-          "GameFlags.VISIBLE_HEALTH",
-          "GameFlags.FAST_TABS"
-        ]
-      }
-    }
-  );
-}
-
-/*
- *Populate the options form with the settings for a lost worlds seed.
- */
-function presetLostWorlds() {
-  applyPreset(
-    {
-      "settings": {
-        "game_mode": "Lost worlds",
-        "enemy_difficulty": "Normal",
-        "item_difficulty": "Normal",
-        "techorder": "Full random",
-        "shopprices": "Normal",
-        "gameflags": [
-          "GameFlags.FIX_GLITCH",
-          "GameFlags.ZEAL_END",
-          "GameFlags.FAST_TABS"
-        ]
-      }
-    }
-  );
-}
-
-/*
- *Populate the options form with the settings for a hard seed.
- */
-function presetHard() {
-  applyPreset(
-    {
-      "settings": {
-        "game_mode": "Standard",
-        "enemy_difficulty": "Hard",
-        "item_difficulty": "Hard",
-        "techorder": "Balanced random",
-        "shopprices": "Normal",
-        "gameflags": [
-          "GameFlags.FIX_GLITCH",
-          "GameFlags.BOSS_SCALE",
-          "GameFlags.LOCKED_CHARS",
-          "GameFlags.FAST_TABS"
-        ]
-      }
-    }
-  );
-}
-
-/*
- *Populate the options form with the settings for a hard seed.
- */
-function presetLegacyOfCyrus() {
-  applyPreset(
-    {
-      "settings": {
-        "game_mode": "Legacy of cyrus",
-        "enemy_difficulty": "Normal",
-        "item_difficulty": "Normal",
-        "techorder": "Full random",
-        "shopprices": "Normal",
-        "gameflags": [
-          "GameFlags.FIX_GLITCH",
-          "GameFlags.FAST_PENDANT",
-          "GameFlags.UNLOCKED_MAGIC",
-          "GameFlags.FAST_TABS",
-          "GameFlags.GEAR_RANDO"
-        ]
-      }
-    }
-  );
+function loadSelectedPreset() {
+  // show the "Upload custom preset" collapse when it is selected
+  $('.custom-preset-collapse').collapse('show');
+  if (document.getElementById('id_preset_file').files[0]) {
+    importPreset();
+  }
+  document.getElementById('id_load_preset_btn').textContent = 'Load Preset';
 }
 
 /*
@@ -563,9 +530,6 @@ function toggleOptions(option) {
     }
   }
 }
-
-// All broken code goes below this line
-// Adding Bucket-specific functions and data
 
 // All quest name tags allowed by the parser.
 const allowedQuestTags = [
