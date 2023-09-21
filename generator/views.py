@@ -201,9 +201,9 @@ class DownloadSpoilerLogView(View):
         if not game.race_seed:
             spoiler_log = RandomizerInterface.get_spoiler_log(
                 pickle.loads(game.configuration), pickle.loads(game.settings), game.seed_hash)
-            file_name = 'spoiler_log_' + share_id + '.txt'
+            file_name = f"spoiler_log_{share_id}.txt"
             response = HttpResponse(content_type='text/plain')
-            response['Content-Disposition'] = 'attachment; filename=%s' % file_name
+            response['Content-Disposition'] = f"attachment; filename={file_name}"
             response.write(spoiler_log.getvalue())
             return response
         else:
@@ -222,13 +222,16 @@ class DownloadJSONSpoilerLogView(View):
         except Game.DoesNotExist:
             return render(request, 'generator/error.html', {'error_text': 'Seed does not exist.'}, status=404)
 
-        response = HttpResponse(content_type='application/json')
+        file_name = f"spoiler_log_{share_id}.json"
+        contents = b'{"cheating": "not_allowed"}'
         if not game.race_seed:
             spoiler_log = RandomizerInterface.get_json_spoiler_log(
                 pickle.loads(game.configuration), pickle.loads(game.settings), game.seed_hash)
-            response.write(spoiler_log.getvalue())
-        else:
-            response.write(b'{"cheating": "not_allowed"}')
+            contents = spoiler_log.getvalue()
+
+        response = HttpResponse(content_type='application/json')
+        response.write(contents)
+        response['Content-Disposition'] = f"attachment; filename={file_name}"
         return response
 
 
@@ -243,7 +246,7 @@ class PracticeSeedView(View):
         except InvalidGameIdException as e:
             return render(request, 'generator/error.html', {'error_text': str(e)}, status=404)
         except InvalidSettingsException as e:
-            return render(request, 'generator/error.html', {'error_text': str(e)}, status=404)
+            return render(request, 'generator/error.html', {'error_text': str(e)}, status=400)
 
         return redirect('/share/' + game.share_id)
 
