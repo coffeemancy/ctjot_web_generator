@@ -2,13 +2,13 @@
 
         <div class="form-row">
           <div class="col">
-            <button class="btn btn-primary mt-1 mb-1" type="button" onclick="resetAll()">Reset All</button>
-            <button class="btn btn-primary mt-1 mb-1" type="button" onclick="applyPreset(presetsMap['race'])">Race</button>
-            <button class="btn btn-primary mt-1 mb-1" type="button" onclick="applyPreset(presetsMap['new_player'])">New Player</button>
-            <button class="btn btn-primary mt-1 mb-1" type="button" onclick="applyPreset(presetsMap['lost_worlds'])">Lost Worlds</button>
-            <button class="btn btn-primary mt-1 mb-1" type="button" onclick="applyPreset(presetsMap['hard'])">Hard</button>
-            <button class="btn btn-primary mt-1 mb-1" type="button" onclick="applyPreset(presetsMap['legacy_of_cyrus'])">Legacy of Cyrus</button>
-            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_load_preset_btn" onclick="loadSelectedPreset()">Upload Preset</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_reset_all_btn">Reset All</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_preset_btn_race">Race</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_preset_btn_new_player">New Player</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_preset_btn_lost_worlds">Lost Worlds</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_preset_btn_hard">Hard</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_preset_btn_legacy_of_cyrus">Legacy of Cyrus</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_load_preset_btn">Upload Preset</button>
           </div>
 
           <div class="w-100"></div>
@@ -25,7 +25,7 @@
               <div class="input-group-prepend">
                 <div class="input-group-text">Upload Preset</div>
               </div>
-              <input type="file" accept="application/JSON" class="form-control-file form-control" id="{{form.preset_file.id_for_label}}" name="{{form.preset_file.name}}" onchange="loadSelectedPreset()">
+              <input type="file" accept="application/JSON" class="form-control-file form-control" id="{{form.preset_file.id_for_label}}" name="{{form.preset_file.name}}">
             </div>
           </div>
           <div class="w-100"></div>

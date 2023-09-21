@@ -2,12 +2,12 @@
             <div class="tab-content border border-primary rounded p-2 mb-3">
 
               <div class="form-group form-check pt-3 pl-0">
-                <input type="checkbox" name="{{form.duplicate_characters.name}}" id="{{form.duplicate_characters.id_for_label}}" data-toggle="toggle" onchange="disableDuplicateTechs()" />
+                <input type="checkbox" name="{{form.duplicate_characters.name}}" id="{{form.duplicate_characters.id_for_label}}" data-toggle="toggle">
                 <label for="{{form.duplicate_characters.id_for_label}}">Duplicate Characters</label>
               </div>
 
               <div class="form-group form-check pt-3 pl-0">
-                <input type="checkbox" name="{{form.duplicate_duals.name}}" id="{{form.duplicate_duals.id_for_label}}" data-toggle="toggle" />
+                <input type="checkbox" name="{{form.duplicate_duals.name}}" id="{{form.duplicate_duals.id_for_label}}" data-toggle="toggle">
                 <label for="{{form.duplicate_duals.id_for_label}}">Duplicate Dual Techs</label>
               </div>
 
@@ -45,8 +45,8 @@
                 {% endwith %}
                 </table>
                 <div class="pt-2">
-                  <input class="btn btn-outline-primary btn-sm" type="button" form="none" value="Check All" onclick="rcCheckAll()">
-                  <input class="btn btn-outline-primary btn-sm" type="button" form="none" value="Uncheck All" onclick="rcUncheckAll()">
+                  <input class="btn btn-outline-primary btn-sm" type="button" form="none" value="Check All" id="id_rc_check_all">
+                  <input class="btn btn-outline-primary btn-sm" type="button" form="none" value="Uncheck All" id="id_rc_uncheck_all">
                 </div>
               </div>
 

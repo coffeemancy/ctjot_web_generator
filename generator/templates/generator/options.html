@@ -27,7 +27,7 @@
       <h2 class="pt-4">Presets</h2>
       {% include "generator/options/presets.html" %}
 
-      <form name="game_options_form" id="game_options_form" action="{% url 'generator:generate' %}" method="post" enctype="multipart/form-data" onsubmit="return prepareForm()">
+      <form name="game_options_form" id="game_options_form" action="{% url 'generator:generate' %}" method="post" enctype="multipart/form-data">
         {% csrf_token %}
 
         <h2 class="mt-3"> Select Game Options (<a href="https://wiki.ctjot.com/doku.php?id=flags" target="_blank">help</a>)</h2>

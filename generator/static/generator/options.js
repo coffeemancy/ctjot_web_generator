@@ -16,8 +16,11 @@ const obhintMap = getJsonScriptData('obhint-map');
 const presetsMap = getJsonScriptData('presets-map');
 const settingsDefaults = getJsonScriptData('settings-defaults');
 
+const tabTypes = ['power', 'magic', 'speed'];
 const charIdentities = ['Crono', 'Marle', 'Lucca', 'Robo', 'Frog', 'Ayla', 'Magus'];
 const charModels = ['0', '1', '2', '3', '4', '5', '6'];
+
+const optionToggleIds = ['boss_rando', 'bucket_list', 'char_rando', 'mystery_seed'];
 
 /* Mystery Settings sliders mapping of DOM id to MysterySettings field and key */
 const mysterySliders = {
@@ -150,33 +153,6 @@ function setSlider(id, value, suffix='') {
 }
 
 /*
- * Intended-to-be-idempotent (re-)initialization of page state.
- */
-function initAll() {
-  let options = ['char_rando', 'boss_rando', 'mystery_seed', 'bucket_list'];
-  options.forEach((option) => toggleOptions(option));
-  restrictFlags();
-  disableDuplicateTechs();
-  $('#id_disable_glitches').prop('checked', true).change();
-  $('#id_fast_tabs').prop('checked', true).change();
-}
-
-/*
- * Initialize some UI settings when page (re-)loaded.
- */
-function initOnce() {
-  // only add listeners once, on page load; don't add again when resetAll called
-  Object.entries(mysterySliders).forEach(([id, _]) => createSlider(id));
-  Object.entries(mysteryFlagSliders).forEach(([id, _]) => createSlider(id, '%'));
-  ['power', 'magic', 'speed'].forEach((tab) => createMinMaxSlidersPair(tab + '_tab_min', tab + '_tab_max'));
-  createBucketSliders();
-
-  // preform intended-to-be-idempotent (re-)initialization
-  initAll();
-}
-$(document).ready(initOnce);
-
-/*
  * Apply preset values to all form inputs.
  */
 function applyPreset(preset) {
@@ -220,7 +196,7 @@ function applyPreset(preset) {
     return preset.settings.tab_settings[key] ?? missing;
   });
 
-  ['power', 'magic', 'speed'].forEach((tab) => {
+  tabTypes.forEach((tab) => {
     setSlider(tab + '_tab_max', tabSetting(tab + '_max'));
     setSlider(tab + '_tab_min', tabSetting(tab + '_min'));
   });
@@ -295,18 +271,6 @@ function applyPreset(preset) {
   // read objective hints from preset
   let hints = bucketSetting('hints') ?? [];
   [...Array(8).keys()].forEach((index) => $('#id_obhint_entry' + (index + 1)).val(hints[index] ?? '').change());
-}
-
-/*
- * Reset all form inputs to default values.
- */
-function resetAll() {
-  // direct focus back to General tab
-  $('a[href="#options-general"]').tab('show');
-  initAll();
-  applyPreset({'settings': {}});
-  $('.custom-preset-collapse').collapse('hide');
-  document.getElementById('id_load_preset_btn').textContent = 'Upload Preset';
 }
 
 /*
@@ -456,49 +420,56 @@ function unrestrictFlag(flag) {
   toggle.prop('disabled', false);
 }
 
-/*
- * Toggle flags related to Rocksanity when rocksanity is toggled.
- *
- * Provides visual clues to users for things that fix_flag_conflicts in randomizer
- * already does (enable Unlocked Skyways, effectively Remove Black Omen spot
- * when using Ice Age or Legacy of Cyrus).
- */
-var priorUnlockedSkyways = $('#id_unlocked_skyways').prop('checked');
-var priorRemoveBlackOmenSpot = $('#id_remove_black_omen_spot').prop('checked');
-function toggleRocksanityRelated() {
-  let game_mode = $('#id_game_mode').val();
+function toggleFlagsRelated(id) {
+  const flag = enumsMap.gameflags[id];
+  const toggleOn = $('#id_' + id).prop('checked');
 
-  if ($('#id_rocksanity').prop('checked')) {
-    priorUnlockedSkyways = $('#id_unlocked_skyways').prop('checked');
-    priorRemoveBlackOmenSpot = $('#id_remove_black_omen_spot').prop('checked');
-    $('#id_unlocked_skyways').prop('checked', true).change();
+  let forcedOn = [];
+  let forcedOff = forcedFlagsMap.forced_off[flag] ?? [];
 
-    // visually indicate that some modes effectively remove black omen spot
-    if ((game_mode == 'ice_age') || (game_mode == 'legacy_of_cyrus')) {
-      $('#id_remove_black_omen_spot').prop('checked', true).change();
-    }
+  if(toggleOn) {
+    // flag is on, clear any restricted flags from "forced on"
+    forcedOn = forcedFlagsMap.forced_on[flag] ?? [];
+    forcedOn.forEach((flag) => {
+      unrestrictFlag(flag);
+      let elem = $('#id_' + invEnumsMap.gameflags[flag]);
+      if(!elem.prop('checked')) { elem.prop('checked', true).change() }
+    });
+
+    // restrict all from "forced off"
+    forcedOff.forEach((flag) => restrictFlag(flag));
   } else {
-    // check to prevent infinite recursion
-    if ($('#id_unlocked_skyways').prop('checked') != priorUnlockedSkyways) {
-      $('#id_unlocked_skyways').prop('checked', priorUnlockedSkyways).change();
-    }
+    // flag is off, clear any restricted flags from "forced off"
+    forcedOff = forcedFlagsMap.forced_off[flag] ?? [];
+    forcedOff.forEach((flag) => unrestrictFlag(flag));
   }
+
+  return [forcedOn, forcedOff];
 }
 
-/*
- * Toggle flags related to Unlocked Skyways when it is toggled.
- *
- * Provides visual cluse to users for related/dependencies when Unlocked
- * Skyways is toggled (e.g. turn off Rocksanity if Unlocked Skyways is removed).
- */
-function toggleUnlockedSkywaysRelated() {
-  if (!$('#id_unlocked_skyways').prop('checked')) {
-    // check to prevent infinite recursion
-    if ($('#id_rocksanity').prop('checked')) {
-      priorUnlockedSkyways = false;
-      $('#id_rocksanity').prop('checked', false).change();
-    }
-  }
+function toggleModeRelated() {
+  const selectedMode = document.getElementById('id_game_mode').value;
+  const selectedGameMode = enumsMap.game_mode[selectedMode];
+
+  // clear all restricted flags from all non-selected games modes "forced off"
+  Object.keys(enumsMap.game_mode).filter((mode) => mode != selectedMode).forEach((mode) => {
+    let gameMode = enumsMap.game_mode[mode];
+    let forcedOff = forcedFlagsMap.forced_off[gameMode] ?? [];
+    forcedOff.forEach((flag) => unrestrictFlag(flag));
+  });
+
+  // set "forced on" flags for this game mode
+  let forcedOn = forcedFlagsMap.forced_on[selectedGameMode] ?? [];
+  forcedOn.forEach((flag) => {
+    unrestrictFlag(flag);
+    $('#id_' + invEnumsMap.gameflags[flag]).prop('checked', true).change();
+  });
+
+  // restrict all flags from "forced off" for this game mode
+  let forcedOff = forcedFlagsMap.forced_off[selectedGameMode] ?? [];
+  forcedOff.forEach((flag) => restrictFlag(flag));
+
+  return [forcedOn, forcedOff];
 }
 
 /*
@@ -845,15 +816,95 @@ function validateLogicTweaks(){
 }
 
 /*
- * Unset and disable flags based on the chosen game mode. Restore them if the mode permits.
+ * Initialize listeners for UI bottons / options.
  */
-function restrictFlags() {
-  const mode = document.getElementById('id_game_mode').value;
-  const key = enumsMap.game_mode[mode];
-  const forcedOff = forcedFlagsMap.forced_off[key] ?? [];
+function initButtonsListeners() {
+  const presets  = ['race', 'new_player', 'lost_worlds', 'hard', 'legacy_of_cyrus'];
+  presets.forEach((preset) => $('#id_preset_btn_' + preset).on('click', () => applyPreset(presetsMap[preset])));
+  $('#id_reset_all_btn').on('click', () => resetAll());
+  $('#id_load_preset_btn').on('click', () => loadSelectedPreset());
+  $('#id_preset_file').on('change', () => loadSelectedPreset());
 
-  Object.entries(enumsMap.gameflags).forEach(([_, flag]) => {
-    if(forcedOff.includes(flag)) { restrictFlag(flag) }
-    else{ unrestrictFlag(flag) }
+  // char rando tab
+  $('#id_rc_check_all').on('click', () => rcCheckAll());
+  $('#id_rc_uncheck_all').on('click', () => rcUncheckAll());
+}
+
+/*
+ * Initialize listeners for general options and flag toggles.
+ */
+function initFlagsListeners() {
+  $('#id_game_mode').on('change', toggleModeRelated);
+
+  // find all flags that with a "forced on" or "forced off" relationship (which isn't zero/empty)
+  let restrictedFlagIds = new Set();
+  let allFlagIds = Object.keys(enumsMap.gameflags);
+  let allFlags = Object.keys(forcedFlagsMap.forced_on).concat(Object.keys(forcedFlagsMap.forced_off));
+  allFlags.map((flag) => invEnumsMap.gameflags[flag]).filter((id) => {
+    return id && allFlagIds.includes(id);
+  }).forEach((id) => restrictedFlagIds.add(id));
+
+  // add listeners for toggling of all flags that have restrictions ("forced on" or "forced off" relationships)
+  restrictedFlagIds.forEach((id) => $('#id_' + id).on('change', () => toggleFlagsRelated(id)));
+
+  // add additional listeners to enable/disable options
+  optionToggleIds.forEach((id) => $('#id_' + id).on('change', () => toggleOptions(id)));
+
+  // disable duplicate techs when duplicate characters is disabled
+  $('#id_duplicate_characters').on('change', disableDuplicateTechs);
+}
+
+/*
+ * Initialize form listener to validate, prepare, and submit.
+ */
+function initFormListeners() {
+  const gameOptionsForm = document.getElementById('game_options_form');
+
+  gameOptionsForm.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+
+    if(prepareForm()){ gameOptionsForm.submit() }
   });
 }
+
+/*
+ * Intended-to-be-idempotent (re-)initialization of page state.
+ */
+function initAll() {
+  toggleModeRelated();
+  optionToggleIds.forEach((option) => toggleOptions(option));
+  Object.keys(enumsMap.gameflags).forEach((flag) => toggleFlagsRelated(flag));
+  disableDuplicateTechs();
+  $('#id_disable_glitches').prop('checked', true).change();
+  $('#id_fast_tabs').prop('checked', true).change();
+}
+
+/*
+ * Reset all form inputs to default values.
+ */
+function resetAll() {
+  // direct focus back to General tab
+  $('a[href="#options-general"]').tab('show');
+  initAll();
+  applyPreset({'settings': {}});
+  $('.custom-preset-collapse').collapse('hide');
+  document.getElementById('id_load_preset_btn').textContent = 'Upload Preset';
+}
+
+/*
+ * Initialize some UI settings when page (re-)loaded.
+ */
+function initOnce() {
+  // only add listeners once, on page load; don't add again when resetAll called
+  Object.keys(mysterySliders).forEach((id) => createSlider(id));
+  Object.keys(mysteryFlagSliders).forEach((id) => createSlider(id, '%'));
+  tabTypes.forEach((tab) => createMinMaxSlidersPair(tab + '_tab_min', tab + '_tab_max'));
+  createBucketSliders();
+  initButtonsListeners();
+  initFormListeners();
+  initFlagsListeners();
+
+  // preform intended-to-be-idempotent (re-)initialization
+  initAll();
+}
+$(document).ready(initOnce);

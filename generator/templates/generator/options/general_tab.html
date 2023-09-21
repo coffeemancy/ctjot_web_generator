@@ -4,7 +4,7 @@
 
               <div class="form-group mb-4">
                 <label for="{{form.game_mode.id_for_label}}">Game Mode:</label>
-                <select class="form-control" name="{{form.game_mode.name}}" id="{{form.game_mode.id_for_label}}" onchange="restrictFlags()">
+                <select class="form-control" name="{{form.game_mode.name}}" id="{{form.game_mode.id_for_label}}">
                   <option value="standard" selected>Standard</option>
                   <option value="lost_worlds">Lost Worlds</option>
                   <option value="ice_age">Ice Age</option>
@@ -55,7 +55,7 @@
                   </div>
 
                   <div class="form-group form-check pl-0">
-                    <input type="checkbox" name="{{form.mystery_seed.name}}" id="{{form.mystery_seed.id_for_label}}" data-toggle="toggle" onchange="toggleOptions('mystery_seed')">
+                    <input type="checkbox" name="{{form.mystery_seed.name}}" id="{{form.mystery_seed.id_for_label}}" data-toggle="toggle">
                     <label for="{{form.mystery_seed.id_for_label}}">Mystery Seed</label>
                   </div>
                 </div>
@@ -72,7 +72,7 @@
                   </div>
 
                   <div class="form-group form-check pl-0">
-                    <input type="checkbox" name="{{form.boss_rando.name}}" id="{{form.boss_rando.id_for_label}}" data-toggle="toggle" onchange="toggleOptions('boss_rando')">
+                    <input type="checkbox" name="{{form.boss_rando.name}}" id="{{form.boss_rando.id_for_label}}" data-toggle="toggle">
                     <label for="{{form.boss_rando.id_for_label}}">Randomize Bosses</label>
                   </div>
 
@@ -92,7 +92,7 @@
                   </div>
 
                   <div class="form-group form-check pl-0">
-                    <input type="checkbox" name="{{form.char_rando.name}}" id="{{form.char_rando.id_for_label}}" data-toggle="toggle" onchange="toggleOptions('char_rando')">
+                    <input type="checkbox" name="{{form.char_rando.name}}" id="{{form.char_rando.id_for_label}}" data-toggle="toggle">
                     <label for="{{form.char_rando.id_for_label}}">Randomize Characters</label>
                   </div>
 
