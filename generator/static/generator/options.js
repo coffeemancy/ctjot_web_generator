@@ -3,19 +3,261 @@
  * the game options, including preset and validation functions.
  */
 
+/*
+ * Parse content from json-script data into object.
+ */
+function getJsonScriptData(jsonScript) {
+  return JSON.parse(document.getElementById(jsonScript).textContent);
+}
+const gameflagsMap = getJsonScriptData('gameflags-map');
+const obhintMap = getJsonScriptData('obhint-map');
+const settingsDefaults = getJsonScriptData('settings-defaults');
+
 const charIdentities = ['Crono', 'Marle', 'Lucca', 'Robo', 'Frog', 'Ayla', 'Magus'];
 const charModels = ['0', '1', '2', '3', '4', '5', '6'];
 
+/* Mystery Settings sliders mapping of DOM id to MysterySettings field and key */
+const mysterySliders = {
+  // game modes
+  'mystery_game_mode_standard': ['game_mode_freqs', 'Standard'],
+  'mystery_game_mode_lw': ['game_mode_freqs', 'Lost worlds'],
+  'mystery_game_mode_loc': ['game_mode_freqs', 'Legacy of cyrus'],
+  'mystery_game_mode_ia': ['game_mode_freqs', 'Ice age'],
+  'mystery_game_mode_vr': ['game_mode_freqs', 'Vanilla rando'],
+  // item difficulty
+  'mystery_item_difficulty_easy': ['item_difficulty_freqs', 'Easy'],
+  'mystery_item_difficulty_normal': ['item_difficulty_freqs', 'Normal'],
+  'mystery_item_difficulty_hard': ['item_difficulty_freqs', 'Hard'],
+  // enemy difficulty
+  'mystery_enemy_difficulty_normal': ['enemy_difficulty_freqs', 'Normal'],
+  'mystery_enemy_difficulty_hard': ['enemy_difficulty_freqs', 'Hard'],
+  // tech order
+  'mystery_tech_order_normal': ['tech_order_freqs', 'Normal'],
+  'mystery_tech_order_full_random': ['tech_order_freqs', 'Full random'],
+  'mystery_tech_order_balanced_random': ['tech_order_freqs', 'Balanced random'],
+  // shop prices
+  'mystery_shop_prices_normal': ['shop_price_freqs', 'Normal'],
+  'mystery_shop_prices_random': ['shop_price_freqs', 'Fully random'],
+  'mystery_shop_prices_mostly_random': ['shop_price_freqs', 'Mostly random'],
+  'mystery_shop_prices_free': ['shop_price_freqs', 'Free']
+}
+
+/* Mystery Settings flags sliders mapping of DOM id to MysterySettings key (in flag_prob_dict field) */
+const mysteryFlagSliders = {
+  'mystery_tab_treasures': 'tab_treasures',
+  'mystery_unlock_magic': 'unlocked_magic',
+  'mystery_bucket_list': 'bucket_list',
+  'mystery_chronosanity': 'chronosanity',
+  'mystery_boss_rando': 'boss_rando',
+  'mystery_boss_scale': 'boss_scaling',
+  'mystery_locked_characters': 'locked_chars',
+  'mystery_char_rando': 'char_rando',
+  'mystery_duplicate_characters': 'duplicate_characters',
+  'mystery_epoch_fail': 'epoch_fail',
+  'mystery_gear_rando': 'gear_rando',
+  'mystery_heal_rando': 'healing_item_rando'
+}
+
 /*
- * Initialize some UI settings when page (re-)loaded.
+ * Creates a slider with linked text.
+ * Slider element will update text when slider is moved, and update slider when text is entered.
+ * Adds optional suffix to text.
+ */
+function createSlider(id, suffix='') {
+  let slider = document.getElementById('id_' + id);
+  let text = document.getElementById('id_' + id + '_text');
+  text.value = slider.value.toString() + suffix;
+
+  const updateText = () => text.value = slider.value.toString() + suffix;
+  ['change', 'input'].forEach((ev) => slider.addEventListener(ev, updateText));
+
+  const updateSlider = () => slider.value = text.value.toString().replace(suffix, '');
+  ['change', 'input'].forEach((ev) => text.addEventListener(ev, updateSlider));
+
+  return [slider, text];
+}
+
+/*
+ * Creates a pair of "min" and "max" sliders with linked text.
+ * Slider element will update text when slider is moved, and update slider when text is entered.
+ * If min slider value goes above max slider, max slider gets increased.
+ * If max slider value goes below min slider, min slider gets decreased.
+ */
+
+function createMinMaxSlidersPair(id_min, id_max, suffix='') {
+  let [minSlider, minText] = createSlider(id_min, suffix);
+  let [maxSlider, maxText] = createSlider(id_max, suffix);
+
+  // decrease min value if max value goes below it
+  const adjustMin = (() => {
+    if (maxSlider.value < minSlider.value) {
+      minSlider.value = maxSlider.value;
+      minText.value = maxText.value;
+    }
+  });
+
+  // increase max value if min value goes above it
+  const adjustMax = (() => {
+    if (minSlider.value > maxSlider.value) {
+      maxSlider.value = minSlider.value;
+      maxText.value = minText.value;
+    }
+  });
+
+  ['change', 'input'].forEach((ev) => minSlider.addEventListener(ev, adjustMax));
+  ['change', 'input'].forEach((ev) => minText.addEventListener(ev, adjustMax));
+  ['change', 'input'].forEach((ev) => maxSlider.addEventListener(ev, adjustMin));
+  ['change', 'input'].forEach((ev) => maxText.addEventListener(ev, adjustMin));
+
+  return [[minSlider, minText], [maxSlider, maxText]];
+}
+
+function createBucketSliders() {
+  let [
+    [reqObjsSlider, reqObjsText],
+    [numObjsSlider, numObjsText]
+  ] = createMinMaxSlidersPair('bucket_num_objs_req', 'bucket_num_objs');
+
+  const adjustObjectiveEntries = (() => {
+    [...Array(8).keys()].forEach((index) => {
+      let id = 'id_obhint_entry' + (index + 1);
+      document.getElementById(id).disabled = (index > numObjsSlider.value - 1);
+    });
+  });
+
+  ['change', 'input'].forEach((ev) => reqObjsSlider.addEventListener(ev, adjustObjectiveEntries));
+  ['change', 'input'].forEach((ev) => reqObjsText.addEventListener(ev, adjustObjectiveEntries));
+  ['change', 'input'].forEach((ev) => numObjsSlider.addEventListener(ev, adjustObjectiveEntries));
+  ['change', 'input'].forEach((ev) => numObjsText.addEventListener(ev, adjustObjectiveEntries));
+
+  return [[reqObjsSlider, reqObjsText], [numObjsSlider, numObjsText]];
+}
+
+/*
+ * Set slider and linked text to value.
+ */
+function setSlider(id, value, suffix='') {
+  let slider = document.getElementById('id_' + id);
+  let text = document.getElementById('id_' + id + '_text');
+  slider.value = value;
+  text.value = value.toString() + suffix;
+}
+
+/*
+ * Intended-to-be-idempotent (re-)initialization of page state.
  */
 function initAll() {
   let options = ['char_rando', 'boss_rando', 'mystery_seed', 'bucket_list'];
   options.forEach((option) => toggleOptions(option));
   restrictFlags();
   disableDuplicateTechs();
+  $('#id_disable_glitches').prop('checked', true).change();
+  $('#id_fast_tabs').prop('checked', true).change();
 }
-$(document).ready(initAll);
+
+/*
+ * Initialize some UI settings when page (re-)loaded.
+ */
+function initOnce() {
+  // only add listeners once, on page load; don't add again when resetAll called
+  Object.entries(mysterySliders).forEach(([id, _]) => createSlider(id));
+  Object.entries(mysteryFlagSliders).forEach(([id, _]) => createSlider(id, '%'));
+  ['power', 'magic', 'speed'].forEach((tab) => createMinMaxSlidersPair(tab + '_tab_min', tab + '_tab_max'));
+  createBucketSliders();
+
+  // preform intended-to-be-idempotent (re-)initialization
+  initAll();
+}
+$(document).ready(initOnce);
+
+/*
+ * Apply preset values to all form inputs.
+ */
+function applyPreset(preset) {
+  // General options
+  const gameOption = ((key) => {
+    let missing = settingsDefaults[key].toLowerCase().replace(/\s/g, '_');
+    if(!preset.settings[key]) { return missing; }
+    return preset.settings[key].toLowerCase().replace(/\s/g, '_');
+  });
+  $('#id_game_mode').val(gameOption('game_mode')).change();
+  $('#id_enemy_difficulty').val(gameOption('enemy_difficulty')).change();
+  $('#id_item_difficulty').val(gameOption('item_difficulty')).change();
+  $('#id_tech_rando').val(
+    (v => {
+      if (v == 'full_random') { return 'fully_random'; }
+      return v;
+    })(gameOption('techorder'))
+  ).change();
+  $('#id_shop_prices').val(gameOption('shopprices')).change();
+
+  // Flags
+  const hasFlag = ((flag) => {
+    let missing = settingsDefaults.gameflags.includes(flag);
+    if(!preset.settings.gameflags) { return missing; }
+    return preset.settings.gameflags.includes(flag);
+  });
+  Object.entries(gameflagsMap).forEach(([id, flag]) => {
+    $('#id_' + id).prop('checked', hasFlag(flag)).change();
+  });
+
+  $('#id_lost_worlds').prop('checked', false).change();
+  $('#id_spoiler_log').prop('checked', true).change();
+
+  // Tabs options
+  const tabSetting = ((key) => {
+    let missing = settingsDefaults.tab_settings[key];
+    if(!preset.settings.tab_settings) { return missing; }
+    return preset.settings.tab_settings[key] || missing;
+  });
+
+  ['power', 'magic', 'speed'].forEach((tab) => {
+    setSlider(tab + '_tab_max', tabSetting(tab + '_max'));
+    setSlider(tab + '_tab_min', tabSetting(tab + '_min'));
+  });
+  // TODO: missing tab scheme, binom_success
+
+  // Character Rando options
+  if (!hasFlag('GameFlags.DUPLICATE_CHARS')) {
+    $('#id_duplicate_duals').prop('checked', false).change();
+    $('#id_duplicate_duals').addClass('disabled');
+    $('#id_duplicate_duals').prop('disabled', true).change();
+  }
+
+  rcCheckAll();
+
+  // Boss Rando options
+  $('#id_legacy_boss_placement').prop('checked', false).change();
+
+  // Mystery Seed options
+  const mysterySetting = ((field, key) => {
+    let missing = settingsDefaults.mystery_settings[field][key];
+    if(!preset.settings.mystery_settings) { return missing; }
+    if(!preset.settings.mystery_settings[field]) { return missing; }
+    return preset.settings.mystery_settings[field][key] || missing;
+  });
+
+  Object.entries(mysterySliders).forEach(([id, [field, key]]) => setSlider(id, mysterySetting(field, key)));
+  Object.entries(mysteryFlagSliders).forEach(([id, key]) => {
+    let value = 100 * mysterySetting('flag_prob_dict', gameflagsMap[key]);
+    setSlider(id, value, '%');
+  });
+
+  // Bucket Settings
+  const bucketSetting = ((key) => {
+    let missing = settingsDefaults.bucket_settings[key]
+    if(!preset.settings.bucket_settings) { return missing; }
+    return preset.settings.bucket_settings[key] || missing;
+  });
+  setSlider('bucket_num_objs', bucketSetting('num_objectives'));
+  setSlider('bucket_num_objs_req', bucketSetting('num_objectives_needed'));
+  $('#id_bucket_disable_go_modes').prop('checked', bucketSetting('disable_other_go_modes')).change();
+  $('#id_bucket_obj_win_game').prop('checked', bucketSetting('objectives_win')).change();
+
+  // read objective hints from preset
+  let hints = bucketSetting('hints') || [];
+  [...Array(8).keys()].forEach((index) => $('#id_obhint_entry' + (index + 1)).val(hints[index] || '').change());
+}
 
 /*
  * Reset all form inputs to default values.
@@ -23,214 +265,126 @@ $(document).ready(initAll);
 function resetAll() {
   // direct focus back to General tab
   $('a[href="#options-general"]').tab('show');
-
-  // General options
-  $('#id_enemy_difficulty').val('normal');
-  $('#id_item_difficulty').val('normal');
-  $('#id_game_mode').val('standard').change();
-  $('#id_disable_glitches').prop('checked', false).change();
-  $('#id_lost_worlds').prop('checked', false).change();
-  $('#id_boss_scaling').prop('checked', false).change();
-  $('#id_early_pendant').prop('checked', false).change();
-  $('#id_unlocked_magic').prop('checked', false).change();
-  $('#id_chronosanity').prop('checked', false).change();
-  $('#id_boss_rando').prop('checked', false).change();
-  $('#id_zeal').prop('checked', false).change();
-  $('#id_locked_chars').prop('checked', false).change();
-  $('#id_tab_treasures').prop('checked', false).change();
-  $('#id_shop_prices').val('normal');
-  $('#id_tech_rando').val('normal');
-  $('#id_char_rando').prop('checked', false).change();
-  $('#id_healing_item_rando').prop('checked', false).change();
-  $('#id_gear_rando').prop('checked', false).change();
-  $('#id_mystery_seed').prop('checked', false).change();
-  $('#id_spoiler_log').prop('checked', true).change();
-  $('#id_epoch_fail').prop('checked', false).change();
-
-  // Tabs options
-  $('#id_power_tab_min').val(2).change();
-  $('#id_power_tab_max').val(4).change();
-  $('#id_magic_tab_min').val(1).change();
-  $('#id_magic_tab_max').val(3).change();
-  $('#id_speed_tab_min').val(1).change();
-  $('#id_speed_tab_max').val(1).change();
-
-  // Character Rando options
-  $('#id_duplicate_characters').prop('checked', false).change();
-  $('#id_duplicate_duals').prop('checked', false).change();
-  $('#id_duplicate_duals').addClass('disabled');
-  $('#id_duplicate_duals').prop('disabled', true).change();
-
-  rcCheckAll();
-
-  // Boss Rando options
-  $('#id_legacy_boss_placement').prop('checked', false).change();
-  $('#id_boss_spot_hp').prop('checked', false).change();
-
-  // Quality of Life options
-  $('#id_sightscope_always_on').prop('checked', false).change();
-  $('#id_boss_sightscope').prop('checked', false).change();
-  $('#id_fast_tabs').prop('checked', false).change();
-  $('#id_free_menu_glitch').prop('checked', false).change();
-
-  // Extra options
-  $('#id_use_antilife').prop('checked', false).change();
-  $('#id_tackle_effects').prop('checked', false).change();
-  $('#id_starters_sufficient').prop('checked', false).change();
-  $('#id_bucket_list').prop('checked', false).change();
-  $('#id_rocksanity').prop('checked', false).change();
-  $('#id_tech_damage_rando').prop('checked', false).change();
-  $('#id_unlocked_skyways').prop('checked', false).change();
-  $('#id_restore_johnny_race').prop('checked', false).change();
-  $('#id_restore_tools').prop('checked', false).change();
-  $('#id_add_bekkler_spot').prop('checked', false).change();
-  $('#id_add_ozzie_spot').prop('checked', false).change();
-  $('#id_add_racelog_spot').prop('checked', false).change();
-  $('#id_vanilla_robo_ribbon').prop('checked', false).change();
-  $('#id_add_cyrus_spot').prop('checked', false).change();
-  $('#id_add_sunkeep_spot').prop('checked', false).change();
-  $('#id_split_arris_dome').prop('checked', false).change();
-  $('#id_vanilla_desert').prop('checked', false).change();
-
-  // Mystery Seed options
-  // game modes
-  $('#id_mystery_game_mode_standard').val(75).change();
-  $('#id_mystery_game_mode_lw').val(25).change();
-  $('#id_mystery_game_mode_loc').val(0).change();
-  $('#id_mystery_game_mode_ia').val(0).change();
-  // item difficulty
-  $('#id_mystery_item_difficulty_easy').val(15).change();
-  $('#id_mystery_item_difficulty_normal').val(70).change();
-  $('#id_mystery_item_difficulty_hard').val(15).change();
-  // enemy difficulty
-  $('#id_mystery_enemy_difficulty_normal').val(75).change();
-  $('#id_mystery_enemy_difficulty_hard').val(25).change();
-  // tech order
-  $('#id_mystery_tech_order_normal').val(10).change();
-  $('#id_mystery_tech_order_full_random').val(80).change();
-  $('#id_mystery_tech_order_balanced_random').val(10).change();
-  // shop prices
-  $('#id_mystery_shop_prices_normal').val(70).change();
-  $('#id_mystery_shop_prices_random').val(10).change();
-  $('#id_mystery_shop_prices_mostly_random').val(10).change();
-  $('#id_mystery_shop_prices_free').val(10).change();
-  // flag probabilities
-  $('#id_mystery_tab_treasures').val(10).change();
-  $('#id_mystery_unlock_magic').val(50).change();
-  $('#id_mystery_bucket_list').val(15).change();
-  $('#id_mystery_chronosanity').val(30).change();
-  $('#id_mystery_boss_rando').val(50).change();
-  $('#id_mystery_boss_scale').val(30).change();
-  $('#id_mystery_locked_characters').val(25).change();
-  $('#id_mystery_char_rando').val(50).change();
-  $('#id_mystery_duplicate_characters').val(25).change();
-  $('#id_mystery_epoch_fail').val(50).change();
-  $('#id_mystery_gear_rando').val(25).change();
-  $('#id_mystery_heal_rando').val(25).change();
-
-  // Bucket Settings
-  $('#id_bucket_num_objs').val(5).change();
-  $('#id_bucket_num_objs_req').val(4).change();
-  updateObjectiveCount();
-
   initAll();
+  applyPreset({'settings': {}});
 }
 
 /*
  * Populate the options form with the settings for a standard race seed.
  */
 function presetRace() {
-  resetAll();
-  $('#id_enemy_difficulty').val('normal');
-  $('#id_item_difficulty').val('normal');
-  $('#id_disable_glitches').prop('checked', true).change();
-  $('#id_zeal').prop('checked', true).change();
-  $('#id_early_pendant').prop('checked', true).change();
-  $('#id_tech_rando').val('fully_random');
+  applyPreset(
+    {
+      "settings": {
+        "game_mode": "Standard",
+        "enemy_difficulty": "Normal",
+        "item_difficulty": "Normal",
+        "techorder": "Full random",
+        "shopprices": "Normal",
+        "gameflags": [
+          "GameFlags.FIX_GLITCH",
+          "GameFlags.ZEAL_END",
+          "GameFlags.FAST_PENDANT",
+          "GameFlags.FAST_TABS"
+        ]
+      }
+    }
+  );
 }
 
 /*
  * Populate the options form with the settings for a new player seed.
  */
 function presetNewPlayer() {
-  resetAll();
-  $('#id_enemy_difficulty').val('normal');
-  $('#id_item_difficulty').val('easy');
-  $('#id_disable_glitches').prop('checked', true).change();
-  $('#id_zeal').prop('checked', true).change();
-  $('#id_early_pendant').prop('checked', true).change();
-  $('#id_unlocked_magic').prop('checked', true).change();
-  $('#id_tech_rando').val('fully_random');
+  applyPreset(
+    {
+      "settings": {
+        "game_mode": "Standard",
+        "enemy_difficulty": "Normal",
+        "item_difficulty": "Easy",
+        "techorder": "Full random",
+        "shopprices": "Normal",
+        "gameflags": [
+          "GameFlags.FIX_GLITCH",
+          "GameFlags.ZEAL_END",
+          "GameFlags.FAST_PENDANT",
+          "GameFlags.UNLOCKED_MAGIC",
+          "GameFlags.VISIBLE_HEALTH",
+          "GameFlags.FAST_TABS"
+        ]
+      }
+    }
+  );
 }
 
 /*
  *Populate the options form with the settings for a lost worlds seed.
  */
 function presetLostWorlds() {
-  resetAll();
-  $('#id_enemy_difficulty').val('normal');
-  $('#id_item_difficulty').val('normal');
-  $('#id_game_mode').val('lost_worlds').change();
-  $('#id_disable_glitches').prop('checked', true).change();
-  $('#id_zeal').prop('checked', true).change();
-  $('#id_tech_rando').val('fully_random');
+  applyPreset(
+    {
+      "settings": {
+        "game_mode": "Lost worlds",
+        "enemy_difficulty": "Normal",
+        "item_difficulty": "Normal",
+        "techorder": "Full random",
+        "shopprices": "Normal",
+        "gameflags": [
+          "GameFlags.FIX_GLITCH",
+          "GameFlags.ZEAL_END",
+          "GameFlags.FAST_TABS"
+        ]
+      }
+    }
+  );
 }
 
 /*
  *Populate the options form with the settings for a hard seed.
  */
 function presetHard() {
-  resetAll();
-  $('#id_enemy_difficulty').val('hard');
-  $('#id_item_difficulty').val('hard');
-  $('#id_disable_glitches').prop('checked', true).change();
-  $('#id_boss_scaling').prop('checked', true).change();
-  $('#id_locked_chars').prop('checked', true).change();
-  $('#id_tech_rando').val('balanced_random');
+  applyPreset(
+    {
+      "settings": {
+        "game_mode": "Standard",
+        "enemy_difficulty": "Hard",
+        "item_difficulty": "Hard",
+        "techorder": "Balanced random",
+        "shopprices": "Normal",
+        "gameflags": [
+          "GameFlags.FIX_GLITCH",
+          "GameFlags.BOSS_SCALE",
+          "GameFlags.LOCKED_CHARS",
+          "GameFlags.FAST_TABS"
+        ]
+      }
+    }
+  );
 }
 
 /*
  *Populate the options form with the settings for a hard seed.
  */
 function presetLegacyOfCyrus() {
-  resetAll();
-  $('#id_game_mode').val('legacy_of_cyrus').change();
-  $('#id_enemy_difficulty').val('normal');
-  $('#id_item_difficulty').val('normal');
-  $('#id_disable_glitches').prop('checked', true).change();
-  $('#id_early_pendant').prop('checked', true).change();
-  $('#id_unlocked_magic').prop('checked', true).change();
-  $('#id_gear_rando').prop('checked', true).change();
-  $('#id_fast_tabs').prop('checked', true).change();
-  $('#id_tech_rando').val('fully_random');
+  applyPreset(
+    {
+      "settings": {
+        "game_mode": "Legacy of cyrus",
+        "enemy_difficulty": "Normal",
+        "item_difficulty": "Normal",
+        "techorder": "Full random",
+        "shopprices": "Normal",
+        "gameflags": [
+          "GameFlags.FIX_GLITCH",
+          "GameFlags.FAST_PENDANT",
+          "GameFlags.UNLOCKED_MAGIC",
+          "GameFlags.FAST_TABS",
+          "GameFlags.GEAR_RANDO"
+        ]
+      }
+    }
+  );
 }
-
-/*
- * Populate the options form with the settings for a Catalack Cup tournament seed.
- * The Catalack Cup preset buttons have been removed, but the functions are being left
- * in in case they are ever needed again.
- */
- function presetTourney() {
-  resetAll();
-  $('#id_item_difficulty').val('normal');
-  $('#id_tech_rando').val('fully_random');
-  $('#id_shop_prices').val('normal');
-  $('#id_disable_glitches').prop('checked', true).change();
-  $('#id_zeal').prop('checked', true).change();
-  $('#id_early_pendant').prop('checked', true).change();
-  $('#id_boss_rando').prop('checked', true).change();
-  $('#id_boss_spot_hp').prop('checked', true).change();
-  $('#id_fast_tabs').prop('checked', true).change();
-  $('#id_free_menu_glitch').prop('checked', true).change();
-  $('#id_healing_item_rando').prop('checked', true).change();
-  $('#id_gear_rando').prop('checked', true).change();
- }
-
- function presetTourneyTop8() {
-   presetTourney();
-   $('#id_item_difficulty').val('hard');
-   $('#id_free_menu_glitch').prop('checked', false).change();
- }
 
 /*
  * Check all of the character rando assignment boxes.
@@ -330,15 +484,23 @@ function disableDuplicateTechs() {
  * Toggle flags related to Rocksanity when rocksanity is toggled.
  *
  * Provides visual clues to users for things that fix_flag_conflicts in randomizer
- * already does (enable Unlocked Skyways.
+ * already does (enable Unlocked Skyways, effectively Remove Black Omen spot
+ * when using Ice Age or Legacy of Cyrus).
  */
 var priorUnlockedSkyways = $('#id_unlocked_skyways').prop('checked');
+var priorRemoveBlackOmenSpot = $('#id_remove_black_omen_spot').prop('checked');
 function toggleRocksanityRelated() {
   let game_mode = $('#id_game_mode').val();
 
   if ($('#id_rocksanity').prop('checked')) {
     priorUnlockedSkyways = $('#id_unlocked_skyways').prop('checked');
+    priorRemoveBlackOmenSpot = $('#id_remove_black_omen_spot').prop('checked');
     $('#id_unlocked_skyways').prop('checked', true).change();
+
+    // visually indicate that some modes effectively remove black omen spot
+    if ((game_mode == 'ice_age') || (game_mode == 'legacy_of_cyrus')) {
+      $('#id_remove_black_omen_spot').prop('checked', true).change();
+    }
   } else {
     // check to prevent infinite recursion
     if ($('#id_unlocked_skyways').prop('checked') != priorUnlockedSkyways) {
@@ -382,59 +544,6 @@ function prepareForm() {
 }
 
 /*
- * Called when a tab range slider is changed.  Update all tab values on the page.
- */
-function updateAllTabValues(adjustMin = false) {
-  updateTabValuesFromRange("id_power_tab_min", "id_power_tab_max", "power_tab_min_text", "power_tab_max_text", adjustMin);
-  updateTabValuesFromRange("id_magic_tab_min", "id_magic_tab_max", "magic_tab_min_text", "magic_tab_max_text", adjustMin);
-  updateTabValuesFromRange("id_speed_tab_min", "id_speed_tab_max", "speed_tab_min_text", "speed_tab_max_text", adjustMin);
-}
-
-/*
- * Update the min/max values of a tab based on range slider input.
- * Perform some basic validation to make sure the values make sense.
- */
-function updateTabValuesFromRange(rangeMin, rangeMax, textMin, textMax, adjustMin) {
-  var min = document.getElementById(rangeMin).value;
-  var max = document.getElementById(rangeMax).value;
-
-  if (min > max) {
-    if (adjustMin) {
-      min = max
-    } else {
-      max = min;
-    }
-  }
-
-  document.getElementById(textMin).value = min;
-  document.getElementById(textMax).value = max;
-  document.getElementById(rangeMin).value = min;
-  document.getElementById(rangeMax).value = max;
-}
-
-/*
- * Update the mystery flags slider text boxes.
- */
-function updateMysterySettings() {
-  var id_list_relative = ['mystery_game_mode_standard', 'mystery_game_mode_lw', 'mystery_game_mode_loc', 'mystery_game_mode_ia',
-    'mystery_item_difficulty_easy', 'mystery_item_difficulty_normal', 'mystery_item_difficulty_hard',
-    'mystery_enemy_difficulty_normal', 'mystery_enemy_difficulty_hard',
-    'mystery_tech_order_normal', 'mystery_tech_order_full_random', 'mystery_tech_order_balanced_random',
-    'mystery_shop_prices_normal', 'mystery_shop_prices_random', 'mystery_shop_prices_mostly_random', 'mystery_shop_prices_free'];
-  var id_list_percentage = ['mystery_tab_treasures', 'mystery_unlock_magic', 'mystery_bucket_list', 'mystery_chronosanity',
-    'mystery_boss_rando', 'mystery_boss_scale', 'mystery_locked_characters', 'mystery_char_rando', 'mystery_duplicate_characters',
-    'mystery_epoch_fail', 'mystery_gear_rando', 'mystery_heal_rando'];
-
-  for (const id of id_list_relative) {
-    document.getElementById(id + "_text").value = document.getElementById("id_" + id).value
-  }
-
-  for (const id of id_list_percentage) {
-    document.getElementById(id + "_text").value = document.getElementById("id_" + id).value + "%"
-  }
-}
-
-/*
  * Set the visibility of an options section.
  */
 function toggleOptions(option) {
@@ -447,131 +556,16 @@ function toggleOptions(option) {
   } else {
     optionNav.addClass('disabled');
     optionNav.prop('disabled', true);
+
+    // if currently on that nav tab, boot user back to General
+    if (optionNav.prop('id') == $('.nav .active').attr('id')) {
+      $('a[href="#options-general"]').tab('show');
+    }
   }
 }
 
 // All broken code goes below this line
 // Adding Bucket-specific functions and data
-
-/*
- * Ensure that the number of objectives and the
- */
-function updateObjectiveCount(adjustingRequired = false){
-
-    numObjs = document.getElementById("id_bucket_num_objs").value
-    reqObjs = document.getElementById("id_bucket_num_objs_req").value
-
-    if (reqObjs > numObjs){
-        if (adjustingRequired) {numObjs = reqObjs}
-        else {reqObjs = numObjs}
-    }
-
-    document.getElementById("id_bucket_num_objs").value = numObjs
-    document.getElementById("numObjectivesDisp").value = numObjs
-    document.getElementById("id_bucket_num_objs_req").value = reqObjs
-    document.getElementById("numObjectivesRequiredDisp").value = reqObjs
-
-    // Now enable/disable the objective entries according to numObjs
-    for(var i=0; i<8; i++){
-        var isDisabled = true
-        if (i < numObjs){isDisabled = false}
-        document.getElementById("objEntry"+(i+1)).disabled = isDisabled
-    }
-}
-
-// Parsing objectives
-const objectiveDict = {
-    "Random": "65:quest_gated, 30:boss_nogo, 15:recruit_gated",
-    "Random Gated Quest": "quest_gated",
-    "Random Hard Quest": "quest_late",
-    "Random Go Mode Quest": "quest_go",
-    "Random Gated Character Recruit": "recruit_gated",
-    "Random Boss (Includes Go Mode Dungeons)": "boss_any",
-    "Random Boss from Go Mode Dungeon": "boss_go",
-    "Random Boss (No Go Mode Dungeons)": "boss_nogo",
-    "Recruit a Random Gated Character": "recruit_gated",
-    "Recruit 3 Characters (Total 5)": "recruit_3",
-    "Recruit 4 Characters (Total 6)": "recruit_4",
-    "Recruit 5 Characters (Total 7)": "recruit_5",
-    "Collect 10 of 20 Fragments": "collect_10_fragments_20",
-    "Collect 10 of 30 Fragments": "collect_10_fragments_30",
-    "Collect 3 Rocks": "collect_3_rocks",
-    "Collect 4 Rocks": "collect_4_rocks",
-    "Collect 5 Rocks": "collect_5_rocks",
-    "Forge the Masamune": "quest_forge",
-    "Charge the Moonstone": "quest_moonstone",
-    "Trade the Jerky Away": "quest_jerky",
-    "Defeat the Arris Dome Boss": "quest_arris",
-    "Visit Cyrus's Grave with Frog": "quest_cyrus",
-    "Defeat the Boss of Death's Peak": "quest_deathpeak",
-    "Defeat the Boss of Denadoro Mountains": "quest_denadoro",
-    "Gain Epoch Flight": "quest_epoch",
-    "Defeat the Boss of the Factory Ruins": "quest_factory",
-    "Defeat the Boss of the Geno Dome": "quest_geno",
-    "Defeat the Boss of the Giant's Claw": "quest_claw",
-    "Defeat the Boss of Heckran's Cave": "quest_heckran",
-    "Defeat the Boss of the King's Trial": "quest_shard",
-    "Defeat the Boss of Manoria Cathedral": "quest_cathedral",
-    "Defeat the Boss of Mount Woe": "quest_woe",
-    "Defeat the Boss of the Pendant Trial": "quest_pendant",
-    "Defeat the Boss of the Reptite Lair": "quest_reptite",
-    "Defeat the Boss of the Sun Palace": "quest_sunpalace",
-    "Defeat the Boss of the Sunken Desert": "quest_desert",
-    "Defeat the Boss in the Zeal Throneroom": "quest_zealthrone",
-    "Defeat the Boss of Zenan Bridge": "quest_zenan",
-    "Defeat the Black Tyrano": "quest_blacktyrano",
-    "Defeat the Tyrano Lair Midboss": "quest_tyranomid",
-    "Defeat the Boss in Flea's Spot": "quest_flea",
-    "Defeat the Boss in Slash's Spot": "quest_slash",
-    "Defeat Magus in Magus's Castle": "quest_magus",
-    "Defeat the Boss in the GigaMutant Spot": "quest_omengiga",
-    "Defeat the Boss in the TerraMutant Spot": "quest_omenterra",
-    "Defeat the Boss in the ElderSpawn Spot": "quest_omenelder",
-    "Defeat the Boss in the Twin Golem Spot": "quest_twinboss",
-    "Beat Johnny in a Race": "quest_johnny",
-    "Bet on a Fair Race and Win": "quest_fairrace",
-    "Play the Fair Drinking Game": "quest_soda",
-    "Defeat AtroposXR": "boss_atropos",
-    "Defeat DaltonPlus": "boss_dalton",
-    "Defeat DragonTank": "boss_dragontank",
-    "Defeat ElderSpawn": "boss_elderspawn",
-    "Defeat Flea": "boss_flea",
-    "Defeat Flea Plus": "boss_fleaplus",
-    "Defeat Giga Gaia": "boss_gigagaia",
-    "Defeat GigaMutant": "boss_gigamutant",
-    "Defeat Golem": "boss_golem",
-    "Defeat Golem Boss": "boss_golemboss",
-    "Defeat Guardian": "boss_guardian",
-    "Defeat Heckran": "boss_heckran",
-    "Defeat LavosSpawn": "boss_lavosspawn",
-    "Defeat Magus (North Cape)": "boss_magusnc",
-    "Defeat Masamune": "boss_masamune",
-    "Defeat Mother Brain": "boss_motherbrain",
-    "Defeat Mud Imp": "boss_mudimp",
-    "Defeat Nizbel": "boss_nizbel",
-    "Defeat Nizbel II": "boss_nizbel2",
-    "Defeat R-Series": "boss_rseries",
-    "Defeat Retinite": "boss_retinite",
-    "Defeat RustTyrano": "boss_rusttyrano",
-    "Defeat Slash": "boss_slash",
-    "Defeat Son of Sun": "boss_sonofsun",
-    "Defeat Super Slash": "boss_superslash",
-    "Defeat TerraMutant": "boss_terramutant",
-    "Defeat Yakra": "boss_yakra",
-    "Defeat Yakra XIII": "boss_yakraxiii",
-    "Defeat Zombor": "boss_zombor",
-    "Recruit Crono": "recruit_crono",
-    "Recruit Marle": "recruit_marle",
-    "Recruit Lucca": "recruit_lucca",
-    "Recruit Robo": "recruit_robo",
-    "Recruit Frog": "recruit_frog",
-    "Recruit Ayla": "recruit_ayla",
-    "Recruit Magus": "recruit_magus",
-    "Recruit the Guardia Castle Character": "recruit_castle",
-    "Recruit the Dactyl Nest Character": "recruit_dactyl",
-    "Recruit the Proto Dome Character": "recruit_proto",
-    "Recruit the Frog's Burrow Character": "recruit_burrow"
-}
 
 // All quest name tags allowed by the parser.
 const allowedQuestTags = [
@@ -720,9 +714,9 @@ function validateCollectObjective(collectParts){
 function validateObjective(objective){
     // If the user used a preset in the entry box, then use the dict above to resolve it.
     cleanedObjective = objective.toLowerCase()
-    for(var key in objectiveDict){
-        if (objectiveDict.hasOwnProperty(key) && key.toLowerCase() == cleanedObjective){
-            return {isValid: true, result: objectiveDict[key]}
+    for(let key in obhintMap){
+        if (obhintMap.hasOwnProperty(key) && key.toLowerCase() == cleanedObjective){
+            return {isValid: true, result: obhintMap[key]}
         }
     }
 
@@ -735,7 +729,7 @@ function validateObjective(objective){
     }
 
     objectiveParts = cleanedObjective.split(',')
-    for (var i = 0; i < objectiveParts.length; i++){
+    for (let i = 0; i < objectiveParts.length; i++){
         objectivePart = objectiveParts[i]
         // split into weight:objective if possible
         weightSplit = objectivePart.split(':')
@@ -786,15 +780,15 @@ function validateObjective(objective){
  * form fields.
  */
 function validateAndUpdateObjectives(){
-    var bucketList = document.getElementById("id_bucket_list").checked
+    let bucketList = document.getElementById("id_bucket_list").checked
     if (!bucketList){return true}
 
-    var numObjs = document.getElementById("id_bucket_num_objs").value
+    let numObjs = document.getElementById("id_bucket_num_objs").value
 
-    var retFalse = false
-    for(var i = 0; i<Number(numObjs); i++){
-        elementId = 'objEntry'+(i+1)
-        objective = document.getElementById(elementId).value
+    let retFalse = false
+    for(let i = 0; i<Number(numObjs); i++){
+        let elementId = 'id_obhint_entry'+(i+1)
+        let objective = document.getElementById(elementId).value
         const parse = validateObjective(objective)
         const isValid = parse.isValid
         const result = parse.result
@@ -819,7 +813,7 @@ function validateAndUpdateObjectives(){
         return false
     }
 
-    for(var i=Number(numObjs); i<8; i++){
+    for(let i=Number(numObjs); i<8; i++){
         formElementId = 'id_bucket_objective'+(i+1)
         document.getElementById(formElementId).value = 'None'
     }
@@ -830,54 +824,64 @@ function validateAndUpdateObjectives(){
  * Ensure that there are enough KI Spots to support added KIs
  */
 function validateLogicTweaks(){
-    const addKiNames = ['restore_johnny_race', 'restore_tools', 'epoch_fail']
+    // chronosanity always has enough spots
+    if ($('#id_chronosanity').prop('checked')) {
+      return true;
+    }
+
+    const addKiNames = ['restore_johnny_race', 'restore_tools', 'epoch_fail'];
     const addSpotNames = ['add_bekkler_spot', 'add_ozzie_spot',
                           'add_racelog_spot', 'vanilla_robo_ribbon',
-                          'add_cyrus_spot']
+                          'add_cyrus_spot'];
+    let game_mode = $('#id_game_mode').val();
 
-    var numKIs = 0
-    for(var i=0; i<addKiNames.length; i++){
-        const name = addKiNames[i]
-        const id = 'id_'+name
+    let numKIs = addKiNames.filter((ki) => $('#id_' + ki).prop('checked')).length;
 
-        const isChecked = document.getElementById(id).checked
-        if (isChecked){numKIs++}
+    let numSpots = addSpotNames.filter((spot) => $('#id_' + spot).prop('checked')).length;
 
+    // Rocksanity adds 5 KIs, 4-5 spots depending on mode
+    if ($('#id_rocksanity').prop('checked')) {
+      numKIs += 5;
+      let inaccessible = game_mode == 'ice_age' || game_mode == 'legacy_of_cyrus';
+      if (inaccessible || $('#id_remove_black_omen_spot').prop('checked')) { numSpots += 4; }
+      else { numSpots += 5; }
     }
 
-    var numSpots = 0
-    for(var i=0; i<addSpotNames.length; i++){
-        const name = addSpotNames[i]
-        const id = 'id_'+name
+    // some modes have extra spots
+    if (game_mode == 'legacy_of_cyrus') { numSpots++; }
+    else if (game_mode == 'ice_age') { numSpots += 2; }
 
-        const isChecked = document.getElementById(id).checked
-        if (isChecked){numSpots++}
+    // there can be more KI than spots because can erase Jerky
+    // and fix_flag_conflicts can add Robo Ribbon or remove Epoch Fail
+    allowedExtras = 1;
+    if (!$('#id_vanilla_robo_ribbon').prop('checked')) { allowedExtras++; }
+    if ($('#id_epoch_fail').prop('checked')) { allowedExtras++; }
+
+    if (numKIs > numSpots + allowedExtras){
+      let err =
+        "Add additional Key Item spots or remove Key Items." +
+        " (" + numKIs + " KIs > " + (numSpots + allowedExtras) + " spots)";
+      document.getElementById("logicTweakError").innerHTML = err;
+      $('a[href="#options-extra"]').tab('show');
+      return false;
     }
 
-    // There can be one more KI than spot because we just erase Jerky
-    if (numKIs-1 > numSpots){
-        document.getElementById("logicTweakError").innerHTML =
-            "Select Additional Key Item Spots"
-        $('a[href="#options-extra"]').tab('show');
-        return false
-    }
-
-    document.getElementById("logicTweakError").innerHTML = ""
-    return true
+    document.getElementById("logicTweakError").innerHTML = "";
+    return true;
 
 }
 
+// TODO: pull this mapping out of jetsoftime code
 const forceOff = {
     "standard": [],
     "lost_worlds": ["boss_scaling", "bucket_list", "epoch_fail",
                     "add_bekkler_spot", "add_cyrus_spot", "add_ozzie_spot",
-                    "add_racelog_spot", "add_sunkeep_spot",
+                    "add_racelog_spot", "add_sunkeep_spot", "remove_black_omen_spot",
                     "restore_johnny_race", "split_arris_dome",
                     "restore_tools", "unlocked_skyways",
                     "vanilla_desert", "vanilla_robo_ribbon"],
-    "ice_age": ["zeal", "boss_scaling", "bucket_list"],
-    "legacy_of_cyrus": ["zeal", "boss_scale", "bucket_list",
-                        "add_ozzie_spot", "add_cyrus_spot",
+    "ice_age": ["zeal", "boss_scaling", "bucket_list", "add_bekkler_spot"],
+    "legacy_of_cyrus": ["zeal", "boss_scale", "bucket_list", "add_ozzie_spot",
                         "add_sunkeep_spot", "restore_tools",
                         "restore_johnny_race", "split_arris_dome",
                         "add_racelog_spot", "add_bekkler_spot"],
@@ -898,21 +902,25 @@ const totalForceList = [
  * mode permits.
  */
 function restrictFlags(){
-    var mode = document.getElementById("id_game_mode").value
-    var disableList = forceOff[mode]
+    let mode = document.getElementById("id_game_mode").value;
+    let disableList = forceOff[mode];
+    if (!disableList) {
+      console.error('Could not find forceOff list for mode: ' + mode)
+      return
+    }
 
-    for(var i=0; i<totalForceList.length; i++){
-        flag = totalForceList[i]
+    for(let i=0; i<totalForceList.length; i++){
+        flag = totalForceList[i];
 
         if(disableList.includes(flag)){
-            $("#id_"+flag).parent().addClass('btn-light off disabled')
-            $("#id_"+flag).parent().removeClass('btn-primary')
-            $("#id_"+flag).prop('checked', false)
-            $("#id_"+flag).prop('disabled', true)
+            $("#id_"+flag).parent().addClass('btn-light off disabled');
+            $("#id_"+flag).parent().removeClass('btn-primary');
+            $("#id_"+flag).prop('checked', false);
+            $("#id_"+flag).prop('disabled', true);
         }
         else{
-            $("#id_"+flag).parent().removeClass('disabled')
-            $("#id_"+flag).prop('disabled', false)
+            $("#id_"+flag).parent().removeClass('disabled');
+            $("#id_"+flag).prop('disabled', false);
         }
     }
 }

@@ -2,6 +2,9 @@
 
 {% block imports %}
     {% load static %}
+    {{ gameflags_map | json_script:"gameflags-map" }}
+    {{ obhint_map | json_script:"obhint-map" }}
+    <script id="settings-defaults" type="application/json">{{ settings_defaults_json | safe }}</script>
     <script src="{% static 'generator/options.js' %}"></script>
     <link rel="stylesheet" href="{% static 'generator/styles.css' %}">
 {% endblock %}
@@ -13,15 +16,8 @@
 
       <!-- Preset buttons -->
       <h2 class="pt-4">Presets</h2>
-      <div class="border border-primary rounded p-2">
-        <button class="btn btn-primary mt-1 mb-1" type="button" onclick="resetAll()">Reset All</button>
-        <button class="btn btn-primary mt-1 mb-1" type="button" onclick="presetRace()">Race</button>
-        <button class="btn btn-primary mt-1 mb-1" type="button" onclick="presetNewPlayer()">New Player</button>
-        <button class="btn btn-primary mt-1 mb-1" type="button" onclick="presetLostWorlds()">Lost Worlds</button>
-        <button class="btn btn-primary mt-1 mb-1" type="button" onclick="presetHard()">Hard</button>
-        <button class="btn btn-primary mt-1 mb-1" type="button" onclick="presetLegacyOfCyrus()">Legacy of Cyrus</button>
-      </div> <!-- End preset buttons -->
-      
+      {% include "generator/options/presets.html" %}
+
       <form name="game_options_form" id="game_options_form" action="{% url 'generator:generate' %}" method="post" enctype="multipart/form-data" onsubmit="return prepareForm()">
         {% csrf_token %}
 

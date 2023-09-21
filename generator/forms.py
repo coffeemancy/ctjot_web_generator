@@ -107,6 +107,7 @@ class GenerateForm(forms.Form):
     add_ozzie_spot = forms.BooleanField(required=False)
     restore_johnny_race = forms.BooleanField(required=False)
     add_racelog_spot = forms.BooleanField(required=False)
+    remove_black_omen_spot = forms.BooleanField(required=False)
     split_arris_dome = forms.BooleanField(required=False)
     rocksanity = forms.BooleanField(required=False)
     vanilla_robo_ribbon = forms.BooleanField(required=False)
@@ -122,6 +123,7 @@ class GenerateForm(forms.Form):
     mystery_game_mode_lw = forms.IntegerField()
     mystery_game_mode_loc = forms.IntegerField()
     mystery_game_mode_ia = forms.IntegerField()
+    mystery_game_mode_vr = forms.IntegerField()
     #  Item Difficulty
     mystery_item_difficulty_easy = forms.IntegerField()
     mystery_item_difficulty_normal = forms.IntegerField()
@@ -166,4 +168,3 @@ class GenerateForm(forms.Form):
     bucket_objective6 = forms.CharField(required=False)
     bucket_objective7 = forms.CharField(required=False)
     bucket_objective8 = forms.CharField(required=False)
-
