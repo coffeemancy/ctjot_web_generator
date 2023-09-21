@@ -64,9 +64,6 @@ const mysteryFlagSliders = {
   'mystery_heal_rando': 'healing_item_rando'
 }
 
-/* last loaded preset, just for console debugging */
-var lastPreset = {};
-
 /*
  * Creates a slider with linked text.
  * Slider element will update text when slider is moved, and update slider when text is entered.
@@ -211,7 +208,7 @@ function applyPreset(preset) {
 
   // check character choice boxes based on preset
   if(preset.settings.char_settings && preset.settings.char_settings.choices) {
-    char_choices = preset.settings.char_settings.choices;
+    let char_choices = preset.settings.char_settings.choices;
     rcUncheckAll();
     char_choices.forEach((choices, pc_index) => {
       let models = [];
@@ -296,8 +293,6 @@ function importPreset() {
     }
     else { errElem.innerHTML = ""; }
 
-    // set lastPreset, just for console debugging, not otherwise used
-    lastPreset = preset;
     applyPreset(preset);
   };
   reader.onerror = () => { errElem.innerHTML = reader.error; }
@@ -371,7 +366,7 @@ function encodeCharRandoChoices() {
  */
 function validateCharRandoChoices() {
   // ensure each character identity has at least one character model associated
-  modelMissing = charIdentities.some(identity => {
+  const modelMissing = charIdentities.some(identity => {
     return !charModels.some(model => $('#rc_' + identity + model).prop('checked'));
   });
   if (modelMissing) {
@@ -381,10 +376,10 @@ function validateCharRandoChoices() {
     return false;
   }
 
-  let duplicateCharsChecked = $('#id_duplicate_characters').prop('checked');
+  const duplicateCharsChecked = $('#id_duplicate_characters').prop('checked');
   if (!duplicateCharsChecked) {
     // ensure each character model has at least one character identity associated
-    identityMissing = charModels.some(model => {
+    const identityMissing = charModels.some(model => {
       return !charIdentities.some(identity => $('#rc_' + identity + model).prop('checked'));
     });
     if (identityMissing) {
@@ -632,16 +627,16 @@ function validateCollectObjective(collectParts){
     if (collectParts.length < 2){
         return false
     }
-    collectType = collectParts[2]
+    const collectType = collectParts[2];
     if (collectType == 'rocks'){
         if (collectParts.length != 3){return false}
-        numRocks = Number(collectParts[1])
+        const numRocks = Number(collectParts[1])
         if (!Number.isInteger(numRocks) || numRocks < 1){return false}
     } else if (collectType == 'fragments'){
         if (collectParts.length != 4){return false}
 
-        fragsNeeded = Number(collectParts[1])
-        extraFrags = Number(collectParts[3])
+        const fragsNeeded = Number(collectParts[1])
+        const extraFrags = Number(collectParts[3])
 
         if (!Number.isInteger(fragsNeeded) || fragsNeeded < 0){return false}
         if (!Number.isInteger(extraFrags) || extraFrags < 0){return false}
@@ -657,9 +652,9 @@ function validateCollectObjective(collectParts){
  */
 function validateObjective(objective){
     // If the user used a preset in the entry box, then use the dict above to resolve it.
-    cleanedObjective = objective.toLowerCase()
+    let cleanedObjective = objective.toLowerCase()
     for(let key in obhintMap){
-        if (obhintMap.hasOwnProperty(key) && key.toLowerCase() == cleanedObjective){
+        if (Object.keys(obhintMap).includes(key) && key.toLowerCase() == cleanedObjective){
             return {isValid: true, result: obhintMap[key]}
         }
     }
@@ -672,11 +667,11 @@ function validateObjective(objective){
         return {isValid: false, result: "Empty objective string."}
     }
 
-    objectiveParts = cleanedObjective.split(',')
+    const objectiveParts = cleanedObjective.split(',')
     for (let i = 0; i < objectiveParts.length; i++){
-        objectivePart = objectiveParts[i]
+        let objectivePart = objectiveParts[i]
         // split into weight:objective if possible
-        weightSplit = objectivePart.split(':')
+        const weightSplit = objectivePart.split(':')
         if (weightSplit.length > 2){
             // Some error message about unexpected ':'
             return {
@@ -685,7 +680,7 @@ function validateObjective(objective){
             }
         } else if (weightSplit.length == 2) {
             // If there was a weight, verify it's an integer
-            weight = weightSplit[0]
+            const weight = weightSplit[0]
             if (!isInteger(weight) || Number(weight) < 0){
                 return {isValid: false, result: "Weight '"+weight+"' is not a positive integer"}
             }
@@ -693,8 +688,9 @@ function validateObjective(objective){
             objectivePart = weightSplit[1]
         }
 
-        splitObjective = objectivePart.split('_')
-        objectiveType = splitObjective[0]
+        const splitObjective = objectivePart.split('_');
+        const objectiveType = splitObjective[0];
+        let ret;
 
         if (objectiveType == 'quest'){
             ret = validateQuestObjective(splitObjective)
@@ -724,44 +720,44 @@ function validateObjective(objective){
  * form fields.
  */
 function validateAndUpdateObjectives(){
-    let bucketList = document.getElementById("id_bucket_list").checked
-    if (!bucketList){return true}
+  let bucketList = document.getElementById("id_bucket_list").checked
+  if (!bucketList){return true}
 
-    let numObjs = document.getElementById("id_bucket_num_objs").value
+  let numObjs = document.getElementById("id_bucket_num_objs").value
 
-    let retFalse = false
-    for(let i = 0; i<Number(numObjs); i++){
-        let elementId = 'id_obhint_entry'+(i+1)
-        let objective = document.getElementById(elementId).value
-        const parse = validateObjective(objective)
-        const isValid = parse.isValid
-        const result = parse.result
+  let retFalse = false
+  for(let i = 0; i<Number(numObjs); i++){
+    let elementId = 'id_obhint_entry'+(i+1)
+    let objective = document.getElementById(elementId).value
+    const parse = validateObjective(objective)
+    const isValid = parse.isValid
+    const result = parse.result
 
-        if (isValid){
-            const formElementId = 'id_bucket_objective'+(i+1)
-            document.getElementById(formElementId).value = result
+    if (isValid){
+      const formElementId = 'id_bucket_objective'+(i+1)
+      document.getElementById(formElementId).value = result
 
-            const errorElementId = 'objError'+(i+1)
-            document.getElementById(errorElementId).innerHTML = ""
-        }
-        else{
-            const errorElementId = 'objError'+(i+1)
-            document.getElementById(errorElementId).innerHTML = result
-            $('a[href="#options-bucket"]').tab('show');
-            retFalse = true
-        }
-
+      const errorElementId = 'objError'+(i+1)
+      document.getElementById(errorElementId).innerHTML = ""
+    }
+    else{
+      const errorElementId = 'objError'+(i+1)
+      document.getElementById(errorElementId).innerHTML = result
+      $('a[href="#options-bucket"]').tab('show');
+      retFalse = true
     }
 
-    if (retFalse){
-        return false
-    }
+  }
 
-    for(let i=Number(numObjs); i<8; i++){
-        formElementId = 'id_bucket_objective'+(i+1)
-        document.getElementById(formElementId).value = 'None'
-    }
-    return true
+  if (retFalse){
+    return false
+  }
+
+  for(let i=Number(numObjs); i<8; i++){
+    const formElementId = 'id_bucket_objective'+(i+1)
+    document.getElementById(formElementId).value = 'None'
+  }
+  return true
 }
 
 /*
@@ -797,7 +793,7 @@ function validateLogicTweaks(){
 
     // there can be more KI than spots because can erase Jerky
     // and fix_flag_conflicts can add Robo Ribbon or remove Epoch Fail
-    allowedExtras = 1;
+    let allowedExtras = 1;
     if (!$('#id_vanilla_robo_ribbon').prop('checked')) { allowedExtras++; }
     if ($('#id_epoch_fail').prop('checked')) { allowedExtras++; }
 

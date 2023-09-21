@@ -17,3 +17,5 @@ patches
 pickles
 names.txt
 patch.ips
+node_modules
+package-lock.json

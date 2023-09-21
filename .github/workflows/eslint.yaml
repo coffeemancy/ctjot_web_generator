@@ -1,0 +1,22 @@
+---
+name: Run ESLint
+
+on:
+  push:
+    paths:
+      - .github/workflows/eslint.yaml
+      - '**.js'
+      - .eslint*
+      - packages.json
+
+jobs:
+  build:
+    name: Run ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 12
+      - run: npm install
+      - uses: eslint/github-action@v0

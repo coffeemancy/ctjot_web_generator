@@ -1,5 +1,5 @@
 [flake8]
-exclude = .git,__pycache__,jetsoftime
+exclude = .git,__pycache__,jetsoftime,node_modules
 max-line-length = 119
 
 extend-ignore=

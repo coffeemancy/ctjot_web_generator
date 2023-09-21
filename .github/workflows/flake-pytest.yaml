@@ -1,6 +1,15 @@
 name: Python lint and test
 
-on: [push]
+on:
+  push:
+    paths:
+      - .github/workflows/flake-pytest.yaml
+      - '**.py'
+      - .flake8
+      - jetsoftime
+      - pyproject.toml
+      - requirements.txt
+      - test-requirements.txt
 
 jobs:
   build:
