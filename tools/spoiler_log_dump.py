@@ -3,10 +3,14 @@ import argparse
 import io
 import os
 import pickle
+import sys
+
+from typing import Optional
+
 import psycopg2
 import sqlite3
+
 from sqlite3 import Error
-import sys
 
 # Add the randomizer to the system path here.
 # Use the path within the web generator container.
@@ -15,7 +19,7 @@ sys.path.append('/home/ctjot/web/jetsoftime/sourcefiles')
 import randomizer
 
 
-def create_connection() -> sqlite3.Connection:
+def create_connection() -> Optional[sqlite3.Connection]:
     """
     Get a connection to the ctjot database.
 

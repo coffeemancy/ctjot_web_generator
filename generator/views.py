@@ -20,11 +20,14 @@ import json
 import pickle
 import random
 
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict
 
 # Other libraries
 import nanoid
 from PIL import Image, ImageDraw
+
+if TYPE_CHECKING:
+    from django.core.files.uploadfile import UploadedFile
 
 
 class InvalidRomException(Exception):
@@ -125,7 +128,7 @@ class DownloadSeedView(FormView):
     form_class = RomForm
 
     @classmethod
-    def read_and_validate_rom_file(cls, rom_file: bytearray):
+    def read_and_validate_rom_file(cls, rom_file: 'UploadedFile'):
         """
         Read and validate the user's ROM file.
 
@@ -134,7 +137,7 @@ class DownloadSeedView(FormView):
         is too large to be a valid ROM file.
 
         :param rom_file: File object containing a user's ROM
-        :return: bytearray containing ROM data
+        :return: UploadedFile containing ROM data (bytearray)
         """
         # Validate that the file isn't too large to be a CT ROM.
         # Don't waste time reading it if it's not a CT ROM.
@@ -390,7 +393,7 @@ def get_cosmetics(request: HttpRequest) -> Dict[str, Dict[str, Any]]:
     :param: request: HTTP request object passed from view to read cookie.
     :return: Nested dictionary mapping of cosmetic options
     """
-    cosmetics = {
+    cosmetics: Dict[str, Dict[str, Any]] = {
         # general cosmetics
         'reduce_flashes': {'default': False, 'type': 'checked'},
         'quiet_mode': {'default': False, 'type': 'checked'},

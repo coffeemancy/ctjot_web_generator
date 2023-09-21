@@ -11,7 +11,7 @@ import datetime
 import types
 
 from collections import OrderedDict
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 # Web types
 from .forms import GenerateForm, RomForm
@@ -434,7 +434,7 @@ class RandomizerInterface:
         settings.initial_flags = copy.deepcopy(settings.gameflags)
 
         # Character rando
-        char_choices = []
+        char_choices: List[List[int]] = []
         char_rando_assignments = form.cleaned_data['char_rando_assignments']
 
         # character rando assignments comes in as a stringified hex number.
@@ -497,7 +497,7 @@ class RandomizerInterface:
         )
 
         # Mystery
-        settings.mystery_settings.game_mode_freqs: dict[rset.GameMode, int] = {
+        game_mode_freqs: Dict[rset.GameMode, int] = {
             rset.GameMode.STANDARD: form.cleaned_data['mystery_game_mode_standard'],
             rset.GameMode.LOST_WORLDS: form.cleaned_data['mystery_game_mode_lw'],
             rset.GameMode.LEGACY_OF_CYRUS: form.cleaned_data['mystery_game_mode_loc'],
@@ -505,31 +505,31 @@ class RandomizerInterface:
             rset.GameMode.VANILLA_RANDO: form.cleaned_data['mystery_game_mode_vr']
         }
 
-        settings.mystery_settings.item_difficulty_freqs: dict[rset.Difficulty, int] = {
+        item_difficulty_freqs: Dict[rset.Difficulty, int] = {
             rset.Difficulty.EASY: form.cleaned_data['mystery_item_difficulty_easy'],
             rset.Difficulty.NORMAL: form.cleaned_data['mystery_item_difficulty_normal'],
             rset.Difficulty.HARD: form.cleaned_data['mystery_item_difficulty_hard']
         }
 
-        settings.mystery_settings.enemy_difficulty_freqs: dict[rset.Difficulty, int] = {
+        enemy_difficulty_freqs: Dict[rset.Difficulty, int] = {
             rset.Difficulty.NORMAL: form.cleaned_data['mystery_enemy_difficulty_normal'],
             rset.Difficulty.HARD: form.cleaned_data['mystery_enemy_difficulty_hard']
         }
 
-        settings.mystery_settings.tech_order_freqs: dict[rset.TechOrder, int] = {
+        tech_order_freqs: Dict[rset.TechOrder, int] = {
             rset.TechOrder.NORMAL: form.cleaned_data['mystery_tech_order_normal'],
             rset.TechOrder.BALANCED_RANDOM: form.cleaned_data['mystery_tech_order_full_random'],
             rset.TechOrder.FULL_RANDOM: form.cleaned_data['mystery_tech_order_balanced_random']
         }
 
-        settings.mystery_settings.shop_price_freqs: dict[rset.ShopPrices, int] = {
+        shop_price_freqs: Dict[rset.ShopPrices, int] = {
             rset.ShopPrices.NORMAL: form.cleaned_data['mystery_shop_prices_normal'],
             rset.ShopPrices.MOSTLY_RANDOM: form.cleaned_data['mystery_shop_prices_random'],
             rset.ShopPrices.FULLY_RANDOM: form.cleaned_data['mystery_shop_prices_mostly_random'],
             rset.ShopPrices.FREE: form.cleaned_data['mystery_shop_prices_free']
         }
 
-        settings.mystery_settings.flag_prob_dict: dict[rset.GameFlags, int] = {
+        flag_prob_dict: Dict[rset.GameFlags, int] = {
             rset.GameFlags.TAB_TREASURES: form.cleaned_data['mystery_tab_treasures']/100,
             rset.GameFlags.UNLOCKED_MAGIC: form.cleaned_data['mystery_unlock_magic']/100,
             rset.GameFlags.BUCKET_LIST: form.cleaned_data['mystery_bucket_list']/100,
@@ -543,6 +543,13 @@ class RandomizerInterface:
             rset.GameFlags.GEAR_RANDO: form.cleaned_data['mystery_gear_rando']/100,
             rset.GameFlags.HEALING_ITEM_RANDO: form.cleaned_data['mystery_heal_rando']/100
         }
+
+        settings.mystery_settings.game_mode_freqs = game_mode_freqs
+        settings.mystery_settings.item_difficulty_freqs = item_difficulty_freqs
+        settings.mystery_settings.enemy_difficulty_freqs = enemy_difficulty_freqs
+        settings.mystery_settings.tech_order_freqs = tech_order_freqs
+        settings.mystery_settings.shop_price_freqs = shop_price_freqs
+        settings.mystery_settings.flag_prob_dict = flag_prob_dict
 
         return settings
     # End __convert_form_to_settings
@@ -595,14 +602,14 @@ class RandomizerInterface:
     def get_web_spoiler_log(
             settings: rset.Settings,
             config: randoconfig.RandoConfig
-    ) -> dict[str, list[dict[str, str]]]:
+    ) -> Dict[str, List[Dict[str, str]]]:
         """
         Get a dictionary representing the spoiler log data for the given seed.
 
         :param config: RandoConfig object describing the seed
         :return: Dictionary of spoiler data
         """
-        spoiler_log = {
+        spoiler_log: Dict[str, List[Dict[str, str]]] = {
             'characters': [],
             'key_items': [],
             'bosses': [],
@@ -650,7 +657,8 @@ class RandomizerInterface:
         spheres = logicwriter.get_proof_string_from_settings_config(settings, config)
         rgx = re.compile(r'((?P<sphere>GO|(\d?)):\s*)?(?P<desc>.+)')
         for line in spheres.splitlines():
-            spoiler_log['spheres'].append(rgx.search(line).groupdict())
+            if match := rgx.search(line):
+                spoiler_log['spheres'].append(match.groupdict())
 
         return spoiler_log
     # End get_web_spoiler_log
@@ -758,8 +766,7 @@ class RandomizerInterface:
         :return: Random seed string.
         """
         with open("names.txt", "r") as names_file:
-            names = names_file.readline()
-            names = names.split(",")
+            names = names_file.readline().split(',')
         return "".join(random.choice(names) for i in range(2))
 
     @staticmethod

@@ -1,0 +1,11 @@
+[tool.black]
+line-length = 119
+skip_string_normalization = true
+
+[tool.mypy]
+disable_error_code = "annotation-unchecked"
+ignore_missing_imports = true
+exclude = [
+  "^jetsoftime",
+  "^generator/migrations"
+]
