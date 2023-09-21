@@ -608,6 +608,19 @@ class RandomizerInterface:
         return {key: {k: str(v) for k, v in mapping.items()} for key, mapping in enums_map.items()}
 
     @classmethod
+    def get_forced_flags_json(cls) -> str:
+        """
+        Get forced flags mapping encoded as compact JSON.
+
+        This mapping has modes/flags mapped to gameflags (under 'forced_off' or 'forced_on').
+        In the web GUI, 'forced_off' flags get forced off and disabled, instead of just relying
+        on fix_flag_conflicts to turn them off (as happens in the CLI).
+
+        :return: ForcedFlags mapping object encoded as JSON.
+        """
+        return cls._jotjson_encode(rset.ForcedFlags)
+
+    @classmethod
     def get_inv_enums_map(cls) -> Dict[str, Dict[str, str]]:
         """
         Get inverted enums map, with mappings of string repr of randosettings enums mapped to options.js values.

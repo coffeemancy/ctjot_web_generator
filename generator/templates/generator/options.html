@@ -3,6 +3,7 @@
 {% block imports %}
     {% load static %}
     {{ enums_map | json_script:"enums-map" }}
+    <script id="forced-flags-map" type="application/json">{{ forced_flags_json | safe }}</script>
     {{ inv_enums_map | json_script:"inv-enums-map" }}
     {{ obhint_map | json_script:"obhint-map" }}
     <script id="presets-map" type="application/json">

@@ -58,6 +58,7 @@ class OptionsView(View):
         context = {
             'form': form,
             'enums_map': RandomizerInterface.get_enums_map(),
+            'forced_flags_json': RandomizerInterface.get_forced_flags_json(),
             'inv_enums_map': RandomizerInterface.get_inv_enums_map(),
             'obhint_map': RandomizerInterface.get_obhint_map(),
             'presets_map': RandomizerInterface.get_presets_map(),

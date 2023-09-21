@@ -10,6 +10,7 @@ function getJsonScriptData(jsonScript) {
   return JSON.parse(document.getElementById(jsonScript).textContent);
 }
 const enumsMap = getJsonScriptData('enums-map');
+const forcedFlagsMap = getJsonScriptData('forced-flags-map');
 const invEnumsMap = getJsonScriptData('inv-enums-map');
 const obhintMap = getJsonScriptData('obhint-map');
 const presetsMap = getJsonScriptData('presets-map');
@@ -437,14 +438,22 @@ function validateCharRandoChoices() {
  * Disable duplicate techs if duplicate characters is disabled.
  */
 function disableDuplicateTechs() {
-  if ($('#id_duplicate_characters').prop('checked')) {
-    $('#id_duplicate_duals').removeClass('disabled');
-    $('#id_duplicate_duals').prop('disabled', false).change();
-  } else {
-    $('#id_duplicate_duals').prop('checked', false).change();
-    $('#id_duplicate_duals').addClass('disabled');
-    $('#id_duplicate_duals').prop('disabled', true).change();
-  }
+  if ($('#id_duplicate_characters').prop('checked')) { unrestrictFlag(enumsMap.gameflags['duplicate_duals']) }
+  else { restrictFlag(enumsMap.gameflags['duplicate_duals']) }
+}
+
+function restrictFlag(flag) {
+  let toggle = $('#id_' + invEnumsMap.gameflags[flag]);
+  toggle.parent().addClass('btn-light off disabled');
+  toggle.parent().removeClass('btn-primary');
+  toggle.prop('disabled', true);
+  if(toggle.prop('checked')) { toggle.prop('checked', false).change() }
+}
+
+function unrestrictFlag(flag) {
+  let toggle = $('#id_' + invEnumsMap.gameflags[flag]);
+  toggle.parent().removeClass('disabled');
+  toggle.prop('disabled', false);
 }
 
 /*
@@ -835,56 +844,16 @@ function validateLogicTweaks(){
 
 }
 
-// TODO: pull this mapping out of jetsoftime code
-const forceOff = {
-    "standard": [],
-    "lost_worlds": ["boss_scaling", "bucket_list", "epoch_fail",
-                    "add_bekkler_spot", "add_cyrus_spot", "add_ozzie_spot",
-                    "add_racelog_spot", "add_sunkeep_spot", "remove_black_omen_spot",
-                    "restore_johnny_race", "split_arris_dome",
-                    "restore_tools", "unlocked_skyways",
-                    "vanilla_desert", "vanilla_robo_ribbon"],
-    "ice_age": ["zeal", "boss_scaling", "bucket_list", "add_bekkler_spot"],
-    "legacy_of_cyrus": ["zeal", "boss_scale", "bucket_list", "add_ozzie_spot",
-                        "add_sunkeep_spot", "restore_tools",
-                        "restore_johnny_race", "split_arris_dome",
-                        "add_racelog_spot", "add_bekkler_spot"],
-    "vanilla_rando": ["boss_scaling"]
-}
-
-// Const way to iterate over the keys of forceOff?
-const totalForceList = [
-    ... new Set([...forceOff["standard"],
-                 ...forceOff["lost_worlds"],
-                 ...forceOff["ice_age"],
-                 ...forceOff["legacy_of_cyrus"],
-                 ...forceOff["vanilla_rando"]])
-]
-
 /*
- * Unset and disable flags based on the chosen game mode.  Restore them if the
- * mode permits.
+ * Unset and disable flags based on the chosen game mode. Restore them if the mode permits.
  */
-function restrictFlags(){
-    let mode = document.getElementById("id_game_mode").value;
-    let disableList = forceOff[mode];
-    if (!disableList) {
-      console.error('Could not find forceOff list for mode: ' + mode)
-      return
-    }
+function restrictFlags() {
+  const mode = document.getElementById('id_game_mode').value;
+  const key = enumsMap.game_mode[mode];
+  const forcedOff = forcedFlagsMap.forced_off[key] ?? [];
 
-    for(let i=0; i<totalForceList.length; i++){
-        flag = totalForceList[i];
-
-        if(disableList.includes(flag)){
-            $("#id_"+flag).parent().addClass('btn-light off disabled');
-            $("#id_"+flag).parent().removeClass('btn-primary');
-            $("#id_"+flag).prop('checked', false);
-            $("#id_"+flag).prop('disabled', true);
-        }
-        else{
-            $("#id_"+flag).parent().removeClass('disabled');
-            $("#id_"+flag).prop('disabled', false);
-        }
-    }
+  Object.entries(enumsMap.gameflags).forEach(([_, flag]) => {
+    if(forcedOff.includes(flag)) { restrictFlag(flag) }
+    else{ unrestrictFlag(flag) }
+  });
 }
