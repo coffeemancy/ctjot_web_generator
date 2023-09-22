@@ -80,14 +80,14 @@ function createSlider(id, {min, max}={min: 0, max: 100}) {
   const updateSlider = (() => {
     const value = parseInt(text.value);
     // clamp value to (min, max) range
-    if(isInteger(value) && value >= 0) { slider.value = Math.min(max, Math.max(min, value)) }
+    if(Number.isInteger(value) && value >= 0) { slider.value = Math.min(max, Math.max(min, value)) }
   });
   for (const ev of ['change', 'input']) { text.addEventListener(ev, updateSlider) }
 
   // when text element loses focus, if it's not an integer, or out of range, coerce back to slider value
   text.addEventListener('blur', (() => {
     const value = parseInt(text.value);
-    if(!isInteger(value) || value < min || value > max) { text.value = slider.value }
+    if(!Number.isInteger(value) || value < min || value > max) { text.value = slider.value }
   }));
 
   updateText();
@@ -368,33 +368,6 @@ function rcUncheckAll() {
 }
 
 /*
- * Encode the character choices into the hidden form field.
- * Each character is represented by a 2 digit hex string where the
- * bit index represents the character ID. ie:
- *   0x17 - The character can become:
- *      Crono, Marle, Lucca, or Frog.
- */
-function encodeCharRandoChoices() {
-  var encodedString = "";
-  charIdentities.forEach((identity) => {
-    let currentCharValue = 0;
-    charModels.forEach((model, i) => {
-      if ($('#rc_' + identity + model).prop('checked')) {
-        currentCharValue = currentCharValue + (1 << i);
-      }
-    });
-
-    if ((currentCharValue & 0xFF) < 0x10) {
-      // Pad the string with a zero if needed so that the
-      // final string is 14 characters.
-      encodedString += "0";
-    }
-    encodedString += (currentCharValue & 0xFF).toString(16);
-  });
-  $('#id_char_rando_assignments').val(encodedString);
-}
-
-/*
  * Validate that the user's choices for character rando are valid.
  * Each character identity needs to have at least one character model they can turn into.
  * Unless duplicate characters is used, also ensure that each model has at
@@ -506,19 +479,13 @@ function toggleModeRelated() {
 
 /*
  * Pre-submit preparation for the form.
- *   - Validate character rando choices
- *   - Populate the hidden field with character rando information
+ *   - Validate character rando choices, logic tweaks, and objectives.
+ *   - Populate the hidden field with all settings exported as preset JSON.
  */
 function prepareForm() {
-  if (!validateCharRandoChoices()) {
+  if (!validateCharRandoChoices() || !validateLogicTweaks() || !validateAllObjectives()) {
     return false;
   }
-  encodeCharRandoChoices();
-
-  if (!validateLogicTweaks())
-      return false;
-
-  if (!validateAndUpdateObjectives()){return false;}
 
   // Encode preset data into hidden JSON field.
   const presetDataElem = document.getElementById('id_preset');
@@ -757,48 +724,28 @@ function validateObjective(objective){
 }
 
 /*
- * Get the objectives from the entries, parse them, and put them in the actual
- * form fields.
+ * Get the objectives from the entries, parse them, and check they are valid.
  */
-function validateAndUpdateObjectives(){
-  let bucketList = document.getElementById("id_bucket_list").checked
-  if (!bucketList){return true}
+function validateAllObjectives(){
+  const bucketList = $('#id_bucket_list').prop('checked');
+  if (!bucketList){ return true }
 
-  let numObjs = document.getElementById("id_bucket_num_objs").value
+  const numObjs = $('#id_bucket_num_objs').val();
+  const parseResults = [...Array(numObjs).keys()].map((index) => {
+    document.getElementById('objError' + (index + 1)).innerHTML = '';
+    return validateObjective($('#id_obhint_entry' + (index + 1)).val());
+  });
 
-  let retFalse = false
-  for(let i = 0; i<Number(numObjs); i++){
-    let elementId = 'id_obhint_entry'+(i+1)
-    let objective = document.getElementById(elementId).value
-    const parse = validateObjective(objective)
-    const isValid = parse.isValid
-    const result = parse.result
+  const invalidResults = parseResults.filter((result) => !result.isValid);
 
-    if (isValid){
-      const formElementId = 'id_bucket_objective'+(i+1)
-      document.getElementById(formElementId).value = result
+  if(invalidResults.length == 0) { return true }
 
-      const errorElementId = 'objError'+(i+1)
-      document.getElementById(errorElementId).innerHTML = ""
-    }
-    else{
-      const errorElementId = 'objError'+(i+1)
-      document.getElementById(errorElementId).innerHTML = result
-      $('a[href="#options-bucket"]').tab('show');
-      retFalse = true
-    }
-
+  for (const [index, parse] of invalidResults.entries()) {
+    document.getElementById('objError' + (index + 1)).innerHTML = parse.result;
   }
 
-  if (retFalse){
-    return false
-  }
-
-  for(let i=Number(numObjs); i<8; i++){
-    const formElementId = 'id_bucket_objective'+(i+1)
-    document.getElementById(formElementId).value = 'None'
-  }
-  return true
+  $('a[href="#options-bucket"]').tab('show');
+  return false;
 }
 
 /*
@@ -884,8 +831,8 @@ function exportPreset(strict=false) {
   // Tabs options
   let tabSettings = {};
   for (const tab of tabTypes) {
-    const max = $('#id_' + tab + '_tab_max').val();
-    const min = $('#id_' + tab + '_tab_min').val();
+    const max = parseInt($('#id_' + tab + '_tab_max').val());
+    const min = parseInt($('#id_' + tab + '_tab_min').val());
     if(strict || max != settingsDefaults.tab_settings[tab + '_max']) { tabSettings[tab + '_max'] = max }
     if(strict || min != settingsDefaults.tab_settings[tab + '_min']) { tabSettings[tab + '_min'] = min }
   }

@@ -1,6 +1,5 @@
 # Python types
 from __future__ import annotations
-import copy
 import io
 import json
 import os.path
@@ -78,8 +77,6 @@ enums_map: Dict[str, Dict[str, Any]] = {
         'epoch_fail': GF.EPOCH_FAIL,
         'duplicate_characters': GF.DUPLICATE_CHARS,
         'duplicate_duals': GF.DUPLICATE_TECHS,
-        # This should get moved to ROSettings.
-        'boss_spot_hp': GF.BOSS_SPOT_HP,
         # Extra
         'unlocked_skyways': GF.UNLOCKED_SKYGATES,
         'add_sunkeep_spot': GF.ADD_SUNKEEP_SPOT,
@@ -325,8 +322,8 @@ class RandomizerInterface:
         :param form: GenerateForm object from the web interface
         :return: RandoSettings object with flags/settings from the form applied
         """
-
-        settings = rset.Settings()
+        # preset data is passed as JSON in hidden CharField
+        settings = rset.Settings.from_preset_data(form.cleaned_data['preset'])
 
         # Seed
         if form.cleaned_data['seed'] == "":
@@ -334,142 +331,6 @@ class RandomizerInterface:
             settings.seed = cls.get_random_seed()
         else:
             settings.seed = form.cleaned_data['seed']
-
-        # Difficulties
-        settings.item_difficulty = enums_map['item_difficulty'][form.cleaned_data['item_difficulty']]
-        settings.enemy_difficulty = enums_map['enemy_difficulty'][form.cleaned_data['enemy_difficulty']]
-
-        # game mode
-        settings.game_mode = enums_map['game_mode'][form.cleaned_data['game_mode']]
-
-        # shops
-        settings.shopprices = enums_map['shopprices'][form.cleaned_data['shop_prices']]
-
-        # techs
-        settings.techorder = enums_map['techorder'][form.cleaned_data['tech_rando']]
-
-        settings.gameflags = GF(False)
-        for name, flag in enums_map['gameflags'].items():
-            if form.cleaned_data[name]:
-                settings.gameflags |= flag
-
-        settings.initial_flags = copy.deepcopy(settings.gameflags)
-
-        # Character rando
-        char_choices: List[List[int]] = []
-        char_rando_assignments = form.cleaned_data['char_rando_assignments']
-
-        # character rando assignments comes in as a stringified hex number.
-        # Decode the hex string into the char_choices list.
-        # Loop through the characters
-        for i in range(7):
-            char_choices.append([])
-            choices = int(char_rando_assignments[(i * 2):(i * 2) + 2], 16)
-            # Loop through the assignments for the current character
-            for j in range(7):
-                if choices & (1 << j) > 0:
-                    char_choices[i].append(j)
-        settings.char_settings.choices = char_choices
-
-        # Boss rando settings
-        # TODO - Boss and location lists are just default for now. Only update the other options.
-        settings.ro_settings.flags = rset.ROFlags(False)
-        for name, flag in enums_map['roflags'].items():
-            if form.cleaned_data[name]:
-                settings.ro_settings.flags |= flag
-
-        # Tab randomization settings
-        # TODO - Currently defaulting to UNIFORM distribution
-        settings.tab_settings = rset.TabSettings(
-            scheme=rset.TabRandoScheme.UNIFORM,
-            binom_success=.5,
-            power_min=form.cleaned_data['power_tab_min'],
-            power_max=form.cleaned_data['power_tab_max'],
-            magic_min=form.cleaned_data['magic_tab_min'],
-            magic_max=form.cleaned_data['magic_tab_max'],
-            speed_min=form.cleaned_data['speed_tab_min'],
-            speed_max=form.cleaned_data['speed_tab_max']
-        )
-
-        # Bucket Settings
-        disable_other_go_modes = form.cleaned_data['bucket_disable_go_modes']
-        objectives_win = form.cleaned_data['bucket_obj_win_game']
-        num_objectives = form.cleaned_data['bucket_num_objs']
-        num_objectives_needed = form.cleaned_data['bucket_num_objs_req']
-
-        hints = [
-            form.cleaned_data['bucket_objective'+str(ind+1)]
-            for ind in range(num_objectives)
-        ]
-
-        # Hints *should* only be None if bucket_list isn't checked, but let's
-        # be certain.
-        hints = [
-            hint if hint is not None else '' for hint in hints
-        ]
-
-        settings.bucket_settings = rset.BucketSettings(
-            disable_other_go_modes=disable_other_go_modes,
-            objectives_win=objectives_win,
-            num_objectives=num_objectives,
-            num_objectives_needed=num_objectives_needed,
-            hints=hints
-        )
-
-        # Mystery
-        game_mode_freqs: Dict[rset.GameMode, int] = {
-            rset.GameMode.STANDARD: form.cleaned_data['mystery_game_mode_standard'],
-            rset.GameMode.LOST_WORLDS: form.cleaned_data['mystery_game_mode_lw'],
-            rset.GameMode.LEGACY_OF_CYRUS: form.cleaned_data['mystery_game_mode_loc'],
-            rset.GameMode.ICE_AGE: form.cleaned_data['mystery_game_mode_ia'],
-            rset.GameMode.VANILLA_RANDO: form.cleaned_data['mystery_game_mode_vr']
-        }
-
-        item_difficulty_freqs: Dict[rset.Difficulty, int] = {
-            rset.Difficulty.EASY: form.cleaned_data['mystery_item_difficulty_easy'],
-            rset.Difficulty.NORMAL: form.cleaned_data['mystery_item_difficulty_normal'],
-            rset.Difficulty.HARD: form.cleaned_data['mystery_item_difficulty_hard']
-        }
-
-        enemy_difficulty_freqs: Dict[rset.Difficulty, int] = {
-            rset.Difficulty.NORMAL: form.cleaned_data['mystery_enemy_difficulty_normal'],
-            rset.Difficulty.HARD: form.cleaned_data['mystery_enemy_difficulty_hard']
-        }
-
-        tech_order_freqs: Dict[rset.TechOrder, int] = {
-            rset.TechOrder.NORMAL: form.cleaned_data['mystery_tech_order_normal'],
-            rset.TechOrder.BALANCED_RANDOM: form.cleaned_data['mystery_tech_order_full_random'],
-            rset.TechOrder.FULL_RANDOM: form.cleaned_data['mystery_tech_order_balanced_random']
-        }
-
-        shop_price_freqs: Dict[rset.ShopPrices, int] = {
-            rset.ShopPrices.NORMAL: form.cleaned_data['mystery_shop_prices_normal'],
-            rset.ShopPrices.MOSTLY_RANDOM: form.cleaned_data['mystery_shop_prices_random'],
-            rset.ShopPrices.FULLY_RANDOM: form.cleaned_data['mystery_shop_prices_mostly_random'],
-            rset.ShopPrices.FREE: form.cleaned_data['mystery_shop_prices_free']
-        }
-
-        flag_prob_dict: Dict[rset.GameFlags, int] = {
-            rset.GameFlags.TAB_TREASURES: form.cleaned_data['mystery_tab_treasures']/100,
-            rset.GameFlags.UNLOCKED_MAGIC: form.cleaned_data['mystery_unlock_magic']/100,
-            rset.GameFlags.BUCKET_LIST: form.cleaned_data['mystery_bucket_list']/100,
-            rset.GameFlags.CHRONOSANITY: form.cleaned_data['mystery_chronosanity']/100,
-            rset.GameFlags.BOSS_RANDO: form.cleaned_data['mystery_boss_rando']/100,
-            rset.GameFlags.BOSS_SCALE: form.cleaned_data['mystery_boss_scale']/100,
-            rset.GameFlags.LOCKED_CHARS: form.cleaned_data['mystery_locked_characters']/100,
-            rset.GameFlags.CHAR_RANDO: form.cleaned_data['mystery_char_rando']/100,
-            rset.GameFlags.DUPLICATE_CHARS: form.cleaned_data['mystery_duplicate_characters']/100,
-            rset.GameFlags.EPOCH_FAIL: form.cleaned_data['mystery_epoch_fail']/100,
-            rset.GameFlags.GEAR_RANDO: form.cleaned_data['mystery_gear_rando']/100,
-            rset.GameFlags.HEALING_ITEM_RANDO: form.cleaned_data['mystery_heal_rando']/100
-        }
-
-        settings.mystery_settings.game_mode_freqs = game_mode_freqs
-        settings.mystery_settings.item_difficulty_freqs = item_difficulty_freqs
-        settings.mystery_settings.enemy_difficulty_freqs = enemy_difficulty_freqs
-        settings.mystery_settings.tech_order_freqs = tech_order_freqs
-        settings.mystery_settings.shop_price_freqs = shop_price_freqs
-        settings.mystery_settings.flag_prob_dict = flag_prob_dict
 
         return settings
     # End __convert_form_to_settings

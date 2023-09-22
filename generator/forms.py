@@ -67,9 +67,6 @@ class GenerateForm(forms.Form):
     game_mode = forms.CharField(max_length=15)
 
     # Character rando tab
-    char_rando_assignments = forms.CharField(
-        widget=forms.HiddenInput(), required=False
-    )
     duplicate_characters = forms.BooleanField(required=False)
     duplicate_duals = forms.BooleanField(required=False)
 
@@ -159,15 +156,6 @@ class GenerateForm(forms.Form):
     bucket_num_objs_req = forms.IntegerField()
     bucket_disable_go_modes = forms.BooleanField(required=False)
     bucket_obj_win_game = forms.BooleanField(required=False)
-
-    bucket_objective1 = forms.CharField(required=False)
-    bucket_objective2 = forms.CharField(required=False)
-    bucket_objective3 = forms.CharField(required=False)
-    bucket_objective4 = forms.CharField(required=False)
-    bucket_objective5 = forms.CharField(required=False)
-    bucket_objective6 = forms.CharField(required=False)
-    bucket_objective7 = forms.CharField(required=False)
-    bucket_objective8 = forms.CharField(required=False)
 
     # presets
     preset_selection = forms.CharField(max_length=25, required=False)
