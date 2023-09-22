@@ -29,6 +29,7 @@
 
       <form name="game_options_form" id="game_options_form" action="{% url 'generator:generate' %}" method="post" enctype="multipart/form-data">
         {% csrf_token %}
+        <input type="hidden" name="{{form.preset.name}}" id="{{form.preset.id_for_label}}">
 
         <h2 class="mt-3"> Select Game Options (<a href="https://wiki.ctjot.com/doku.php?id=flags" target="_blank">help</a>)</h2>
 
@@ -87,18 +88,27 @@
 
         <h2 class="mt-3">Generate Game</h2>
         <div class="border border-primary rounded p-2 mb-3">
-          <div class="form-group">
+          <div class="form-group" title="Optional seed to set (default: one will be generated).">
             <label for="{{form.seed.id_for_label}}">Seed (optional):</label>
             <input class="form-control" name="{{form.seed.name}}" id="{{form.seed.id_for_label}}" type="text">
           </div>
 
-          <div class="form-group">
+          <div class="form-group" title="Generate a spoiler log along with seed (disable this for race seeds.">
             <input type="checkbox" name="{{form.spoiler_log.name}}" id="{{form.spoiler_log.id_for_label}}" data-toggle="toggle" checked>
             <label for="{{form.spoiler_log.id_for_label}}">Spoiler Log</label>
           </div>
 
           <div class="form-group">
-            <input class="btn btn-primary" type="submit" value="Generate Seed">
+            <input class="btn btn-primary" type="submit" value="Generate Seed" title="Generate Seed based on current selected options.">
+          </div>
+
+          <div class="form-group" title="Create a differential preset (only values different from defaults).">
+            <input type="checkbox" name="diff_preset" id="id_diff_preset" data-toggle="toggle" checked>
+            <label for="id_diff_preset">Create Diff Preset</label>
+          </div>
+
+          <div class="form-group">
+            <input class="btn btn-primary" type="button" id="id_download_preset_btn" value="Download Preset" title="Download Preset JSON file based on current selected options.">
           </div>
         </div>
 

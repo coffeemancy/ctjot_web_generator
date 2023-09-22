@@ -183,9 +183,6 @@ function applyPreset(preset) {
     $('#id_' + id).prop('checked', hasFlag(flag)).change();
   });
 
-  $('#id_lost_worlds').prop('checked', false).change();
-  $('#id_spoiler_log').prop('checked', true).change();
-
   // Tabs options
   const tabSetting = ((key) => {
     let missing = settingsDefaults.tab_settings[key];
@@ -238,7 +235,15 @@ function applyPreset(preset) {
   }
 
   // Boss Rando options
-  $('#id_legacy_boss_placement').prop('checked', false).change();
+  const hasROFlag = ((flag) => {
+    let missing = settingsDefaults.ro_settings.flags.includes(flag);
+    if(!preset.settings.ro_settings) { return missing; }
+    if(!preset.settings.ro_settings.flags) { return missing; }
+    return preset.settings.ro_settings.flags.includes(flag);
+  });
+  Object.entries(enumsMap.roflags).forEach(([id, flag]) => {
+    $('#id_' + id).prop('checked', hasROFlag(flag)).change();
+  });
 
   // Mystery Seed options
   const mysterySetting = ((field, key) => {
@@ -268,6 +273,10 @@ function applyPreset(preset) {
   // read objective hints from preset
   let hints = bucketSetting('hints') ?? [];
   [...Array(8).keys()].forEach((index) => $('#id_obhint_entry' + (index + 1)).val(hints[index] ?? '').change());
+
+  // reset spoiler log and differential preset flags whenever a preset is applied (or "reset all" run)
+  $('#id_spoiler_log').prop('checked', true).change();
+  $('#id_diff_preset').prop('checked', true).change();
 }
 
 /*
@@ -482,6 +491,10 @@ function prepareForm() {
       return false;
 
   if (!validateAndUpdateObjectives()){return false;}
+
+  // Encode preset data into hidden JSON field.
+  const presetDataElem = document.getElementById('id_preset');
+  presetDataElem.value = JSON.stringify(exportPreset(!$('#id_diff_preset').prop('checked')));
   return true;
 }
 
@@ -827,6 +840,102 @@ function initButtonsListeners() {
 }
 
 /*
+ * Export form inputs as preset to be encoded into JSON.
+ * If strict is false (default), always sets general options, but otherwise only non-default options are exported.
+ * When strict is true, export all settings.
+ * Only exports some settings when appropriate flags are enabled:
+ *   - char_settings: only when Char Rando enabled
+ *   - ro_settings: currently not implemented (gameflags alone seems to handle currently-supported Boss Rando options?)
+ *   - mystery_settings: only when Mystery enabled
+ *   - bucket_settings: only when Bucket List enabled
+ */
+function exportPreset(strict=false) {
+  let settings = {}
+
+  // metadata?
+
+  // General options
+  settings['game_mode'] = enumsMap.game_mode[$('#id_game_mode').val()];
+  settings['enemy_difficulty'] = enumsMap.enemy_difficulty[$('#id_enemy_difficulty').val()];
+  settings['item_difficulty'] = enumsMap.item_difficulty[$('#id_item_difficulty').val()];
+  settings['techorder'] = enumsMap.techorder[$('#id_tech_rando').val()];
+  settings['shopprices'] = enumsMap.shopprices[$('#id_shop_prices').val()];
+
+  // Flags
+  const getCheckedFlags = ((map) => {
+    return Object.entries(map).filter(([id, ]) => $('#id_' + id).prop('checked')).map(([, flag]) => flag);
+  });
+  const flags = getCheckedFlags(enumsMap.gameflags);
+  if(strict || flags.length > 0) { settings['gameflags'] = flags; }
+
+  // Tabs options
+  let tabSettings = {};
+  tabTypes.forEach((tab) => {
+    const max = parseInt($('#id_' + tab + '_tab_max').val());
+    const min = parseInt($('#id_' + tab + '_tab_min').val());
+    if(strict || max != settingsDefaults.tab_settings[tab + '_max']) { tabSettings[tab + '_max'] = max }
+    if(strict || min != settingsDefaults.tab_settings[tab + '_min']) { tabSettings[tab + '_min'] = min }
+  });
+  // TODO: missing tab scheme, binom_success
+  if(strict || Object.keys(tabSettings).length > 0) { settings['tab_settings'] = tabSettings }
+
+  // Character Rando options
+  if(strict || settings.gameflags.includes('GameFlags.CHAR_RANDO')) {
+    const choices = charIdentities.map((identity) => {
+      const checkedModels = charModels.filter((model) => $('#rc_' + identity + model).prop('checked'));
+      return checkedModels.map((model) => parseInt(model));
+    });
+    if(strict || JSON.stringify(choices) != JSON.stringify(settingsDefaults.char_settings.choices)) {
+      settings['char_settings'] = {'choices': choices};
+    }
+  }
+
+  // Boss Rando options
+  if(strict || settings.gameflags.includes('GameFlags.BOSS_RANDO')) {
+    const roFlags = getCheckedFlags(enumsMap.roflags);
+    if(strict || roFlags.length > 0) { settings['ro_settings'] = {'flags': roFlags} }
+  }
+
+  // Mystery Seed options
+  if(strict || settings.gameflags.includes('GameFlags.MYSTERY')) {
+    let mysterySettings = {};
+    const setMysterySetting = ((field, key, value) => {
+      if(strict || value != settingsDefaults.mystery_settings[field][key]) {
+        if(!mysterySettings[field]) { mysterySettings[field] = {} }
+        mysterySettings[field][key] = value;
+      }
+    });
+    Object.entries(mysterySliders).forEach(([id, [field, key]]) => {
+      setMysterySetting(field, key, parseInt($('#id_' + id).val()));
+    });
+    Object.entries(mysteryFlagSliders).forEach(([id, key]) => {
+      const value = parseFloat($('#id_' + id).val().replace('%', '')) / 100;
+      const flag = enumsMap.gameflags[key];
+      setMysterySetting('flag_prob_dict', flag, value);
+    });
+    if(strict || Object.keys(mysterySettings).length > 0) { settings['mystery_settings'] = mysterySettings }
+  }
+
+  // Bucket settings
+  if(strict || settings.gameflags.includes('GameFlags.BUCKET_LIST')) {
+    let bucketSettings = {};
+    Object.entries({
+      'num_objectives': parseInt($('#id_bucket_num_objs').val()),
+      'num_objectives_needed': parseInt($('#id_bucket_num_objs_req').val()),
+      'disable_other_go_modes': $('#id_bucket_disable_go_modes').prop('checked'),
+      'objectives_win': $('#id_bucket_obj_win_game').prop('checked'),
+    }).forEach(([key, value]) => {
+      if(strict || value != settingsDefaults.bucket_settings[key]) { bucketSettings[key] = value }
+    });
+    const hints = [...Array(8).keys()].map((index) => $('#id_obhint_entry' + (index + 1)).val());
+    if(strict || hints.length > 0) { bucketSettings['hints'] = hints }
+    if(strict || Object.keys(bucketSettings).length > 0) { settings['bucket_settings'] = bucketSettings }
+  }
+
+  return {'settings': settings}
+}
+
+/*
  * Initialize listeners for general options and flag toggles.
  */
 function initFlagsListeners() {
@@ -858,8 +967,16 @@ function initFormListeners() {
 
   gameOptionsForm.addEventListener('submit', (ev) => {
     ev.preventDefault();
+    gameOptionsForm.action = '/generate-rom/';
 
-    if(prepareForm()){ gameOptionsForm.submit() }
+    if(prepareForm()) { gameOptionsForm.submit() }
+  });
+
+  $('#id_download_preset_btn').on('click', () => {
+    if(prepareForm()) {
+      gameOptionsForm.action = '/download/preset/';
+      gameOptionsForm.submit();
+    }
   });
 }
 

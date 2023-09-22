@@ -91,6 +91,18 @@ class GenerateView(FormView):
         return render(self.request, 'generator/error.html', {'error_text': buffer.getvalue()}, status=404)
 
 
+class DownloadPresetView(GenerateView):
+    def form_valid(self, form):
+        contents = form.cleaned_data['preset']
+        preset = json.loads(contents)
+        response = HttpResponse(content_type='application/json')
+        response.write(contents)
+
+        name = preset.get('metadata', {}).get('name', 'preset').lower().replace(' ', '-')
+        response['Content-Disposition'] = f"attachment; filename={name}.preset.json"
+        return response
+
+
 class ShareLinkView(View):
     """
     Handle a share link for a previously generated game.

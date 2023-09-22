@@ -104,6 +104,10 @@ enums_map: Dict[str, Dict[str, Any]] = {
         'boss_sightscope': GF.BOSS_SIGHTSCOPE,
         'fast_tabs': GF.FAST_TABS,
         'free_menu_glitch': GF.FREE_MENU_GLITCH,
+    },
+    'roflags': {
+        'boss_spot_hp': rset.ROFlags.BOSS_SPOT_HP,
+        'legacy_boss_placement': rset.ROFlags.PRESERVE_PARTS,
     }
 }
 
@@ -370,11 +374,9 @@ class RandomizerInterface:
         # Boss rando settings
         # TODO - Boss and location lists are just default for now. Only update the other options.
         settings.ro_settings.flags = rset.ROFlags(False)
-        if form.cleaned_data['legacy_boss_placement']:
-            settings.ro_settings.flags |= rset.ROFlags.PRESERVE_PARTS
-
-        if form.cleaned_data['boss_spot_hp']:
-            settings.ro_settings.flags |= rset.ROFlags.BOSS_SPOT_HP
+        for name, flag in enums_map['roflags'].items():
+            if form.cleaned_data[name]:
+                settings.ro_settings.flags |= flag
 
         # Tab randomization settings
         # TODO - Currently defaulting to UNIFORM distribution

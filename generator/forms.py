@@ -172,3 +172,4 @@ class GenerateForm(forms.Form):
     # presets
     preset_selection = forms.CharField(max_length=25, required=False)
     preset_file = forms.FileField(required=False)
+    preset = forms.CharField(widget=forms.HiddenInput(), required=True)
