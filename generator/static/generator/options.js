@@ -67,19 +67,30 @@ const mysteryFlagSliders = {
 /*
  * Creates a slider with linked text.
  * Slider element will update text when slider is moved, and update slider when text is entered.
- * Adds optional suffix to text.
  */
-function createSlider(id, suffix='') {
-  let slider = document.getElementById('id_' + id);
-  let text = document.getElementById('id_' + id + '_text');
-  text.value = slider.value.toString() + suffix;
+function createSlider(id, {min, max}={min: 0, max: 100}) {
+  const slider = document.getElementById('id_' + id);
+  const text = document.getElementById('id_' + id + '_text');
 
-  const updateText = () => text.value = slider.value.toString() + suffix;
-  ['change', 'input'].forEach((ev) => slider.addEventListener(ev, updateText));
+  // update text value when slider is changed
+  const updateText = () => text.value = slider.value;
+  for (const ev of ['change', 'input']) { slider.addEventListener(ev, updateText) }
 
-  const updateSlider = () => slider.value = text.value.toString().replace(suffix, '');
-  ['change', 'input'].forEach((ev) => text.addEventListener(ev, updateSlider));
+  // update slider to value when text is changed if text can be parsed as non-negative integer
+  const updateSlider = (() => {
+    const value = parseInt(text.value);
+    // clamp value to (min, max) range
+    if(isInteger(value) && value >= 0) { slider.value = Math.min(max, Math.max(min, value)) }
+  });
+  for (const ev of ['change', 'input']) { text.addEventListener(ev, updateSlider) }
 
+  // when text element loses focus, if it's not an integer, or out of range, coerce back to slider value
+  text.addEventListener('blur', (() => {
+    const value = parseInt(text.value);
+    if(!isInteger(value) || value < min || value > max) { text.value = slider.value }
+  }));
+
+  updateText();
   return [slider, text];
 }
 
@@ -90,15 +101,16 @@ function createSlider(id, suffix='') {
  * If max slider value goes below min slider, min slider gets decreased.
  */
 
-function createMinMaxSlidersPair(id_min, id_max, suffix='') {
-  let [minSlider, minText] = createSlider(id_min, suffix);
-  let [maxSlider, maxText] = createSlider(id_max, suffix);
+function createMinMaxSlidersPair(id_min, id_max, {min, max}={min: 0, max: 100}) {
+  const kwargs = {min: min, max: max};
+  const [minSlider, minText] = createSlider(id_min, kwargs);
+  const [maxSlider, maxText] = createSlider(id_max, kwargs);
 
   // decrease min value if max value goes below it
   const adjustMin = (() => {
     if (maxSlider.value < minSlider.value) {
       minSlider.value = maxSlider.value;
-      minText.value = maxText.value;
+      minText.value = maxSlider.value;
     }
   });
 
@@ -106,51 +118,46 @@ function createMinMaxSlidersPair(id_min, id_max, suffix='') {
   const adjustMax = (() => {
     if (minSlider.value > maxSlider.value) {
       maxSlider.value = minSlider.value;
-      maxText.value = minText.value;
+      maxText.value = minSlider.value;
     }
   });
 
-  ['change', 'input'].forEach((ev) => minSlider.addEventListener(ev, adjustMax));
-  ['change', 'input'].forEach((ev) => minText.addEventListener(ev, adjustMax));
-  ['change', 'input'].forEach((ev) => maxSlider.addEventListener(ev, adjustMin));
-  ['change', 'input'].forEach((ev) => maxText.addEventListener(ev, adjustMin));
+  for (const ev of ['change', 'input']) { minSlider.addEventListener(ev, adjustMax) }
+  for (const ev of ['change', 'input']) { minText.addEventListener(ev, adjustMax) }
+  for (const ev of ['change', 'input']) { maxSlider.addEventListener(ev, adjustMin) }
+  for (const ev of ['change', 'input']) { maxText.addEventListener(ev, adjustMin) }
 
+  adjustMax();
+  adjustMin();
   return [[minSlider, minText], [maxSlider, maxText]];
 }
 
-function createBucketSliders() {
-  let [
-    [reqObjsSlider, reqObjsText],
-    [numObjsSlider, numObjsText]
-  ] = createMinMaxSlidersPair('bucket_num_objs_req', 'bucket_num_objs');
-
-  const adjustObjectiveEntries = (() => {
-    [...Array(8).keys()].forEach((index) => {
-      let id = 'id_obhint_entry' + (index + 1);
-      document.getElementById(id).disabled = (index > numObjsSlider.value - 1);
-    });
-  });
-
-  ['change', 'input'].forEach((ev) => reqObjsSlider.addEventListener(ev, adjustObjectiveEntries));
-  ['change', 'input'].forEach((ev) => reqObjsText.addEventListener(ev, adjustObjectiveEntries));
-  ['change', 'input'].forEach((ev) => numObjsSlider.addEventListener(ev, adjustObjectiveEntries));
-  ['change', 'input'].forEach((ev) => numObjsText.addEventListener(ev, adjustObjectiveEntries));
-
-  return [[reqObjsSlider, reqObjsText], [numObjsSlider, numObjsText]];
+/*
+ * Adjust whether bucket list objective elements are disabled based on number of objectives..
+ */
+function adjustObjectiveEntries() {
+  const numObjsSlider = document.getElementById('id_bucket_num_objs');
+  for (const index of [...Array(8).keys()]) {
+    const id = 'id_obhint_entry' + (index + 1);
+    document.getElementById(id).disabled = (index > numObjsSlider.value - 1);
+  }
 }
+
+
 
 /*
  * Set slider and linked text to value.
  */
-function setSlider(id, value, suffix='') {
-  let slider = document.getElementById('id_' + id);
-  let text = document.getElementById('id_' + id + '_text');
+function setSlider(id, value) {
+  const slider = document.getElementById('id_' + id);
+  const text = document.getElementById('id_' + id + '_text');
   slider.value = value;
-  text.value = value.toString() + suffix;
+  text.value = value;
 }
 
 /*
  * Apply preset values to all form inputs.
+ * TODO: move handling of type-/boundary-checking of preset prior to passing to this function
  */
 function applyPreset(preset) {
   // metadata
@@ -163,10 +170,11 @@ function applyPreset(preset) {
 
   // General options
   const gameOption = ((key) => {
-    let missing = invEnumsMap[key][settingsDefaults[key]];
+    const missing = invEnumsMap[key][settingsDefaults[key]];
     if(!preset.settings[key]) { return missing; }
-    return invEnumsMap[key][preset.settings[key]];
+    return invEnumsMap[key][preset.settings[key]] ?? missing;
   });
+
   $('#id_game_mode').val(gameOption('game_mode')).change();
   $('#id_enemy_difficulty').val(gameOption('enemy_difficulty')).change();
   $('#id_item_difficulty').val(gameOption('item_difficulty')).change();
@@ -175,47 +183,53 @@ function applyPreset(preset) {
 
   // Flags
   const hasFlag = ((flag) => {
-    let missing = settingsDefaults.gameflags.includes(flag);
+    const missing = settingsDefaults.gameflags.includes(flag);
     if(!preset.settings.gameflags) { return missing; }
     return preset.settings.gameflags.includes(flag);
   });
-  Object.entries(enumsMap.gameflags).forEach(([id, flag]) => {
+
+  for (const [id, flag] of Object.entries(enumsMap.gameflags)) {
     $('#id_' + id).prop('checked', hasFlag(flag)).change();
-  });
+  }
 
   // Tabs options
   const tabSetting = ((key) => {
-    let missing = settingsDefaults.tab_settings[key];
+    const missing = settingsDefaults.tab_settings[key];
     if(!preset.settings.tab_settings) { return missing; }
-    return preset.settings.tab_settings[key] ?? missing;
+    return parseInt(preset.settings.tab_settings[key]) || missing;
   });
 
-  tabTypes.forEach((tab) => {
-    setSlider(tab + '_tab_max', tabSetting(tab + '_max'));
-    setSlider(tab + '_tab_min', tabSetting(tab + '_min'));
-  });
+  for (const tab of tabTypes) {
+    const max = tabSetting(tab + '_max');
+    const min = Math.min(tabSetting(tab + '_min'), max);
+    setSlider(tab + '_tab_max', max);
+    setSlider(tab + '_tab_min', min);
+  }
   // TODO: missing tab scheme, binom_success
 
   // Character Rando options
-  if (!hasFlag('GameFlags.DUPLICATE_CHARS')) {
-    $('#id_duplicate_duals').prop('checked', false).change();
-    $('#id_duplicate_duals').addClass('disabled');
-    $('#id_duplicate_duals').prop('disabled', true).change();
-  }
-
   // check character choice boxes based on preset
-  if(preset.settings.char_settings && preset.settings.char_settings.choices) {
-    let char_choices = preset.settings.char_settings.choices;
+  // if someone passed in a non-array in preset, just use defaults
+  // TODO: this could be handled by validation prior to applyPreset
+  const hasChoices =
+    preset.settings.char_settings &&
+    preset.settings.char_settings.choices &&
+    Object.prototype.toString.call(preset.settings.char_settings.choices) == '[object Array]';
+
+  if(hasChoices) {
+    const char_choices = preset.settings.char_settings.choices;
+
     rcUncheckAll();
-    char_choices.forEach((choices, pc_index) => {
+
+    for (const [pc_index, choices] of char_choices.entries()) {
       let models = [];
 
       // choices is string, coerce to list
       if (Object.prototype.toString.call(choices) === "[object String]") {
-        let splits = choices.split(" ");
+        const splits = choices.split(" ");
         if(splits[0] == "any") { models = charModels }
         else {
-          let modelChoices = splits.map((choice) => {
+          const modelChoices = splits.map((choice) => {
             return charIdentities.findIndex((identity) => identity.toLowerCase() == choice.toLowerCase());
           }).filter((index) => index > -1).map((index) => charModels[index]);
 
@@ -224,9 +238,9 @@ function applyPreset(preset) {
         }
       } else { models = choices }
 
-      let identity = charIdentities[pc_index];
-      models.forEach((model) => $('#rc_' + identity + model).prop('checked', true));
-    });
+      const identity = charIdentities[pc_index];
+      for (const model of models) { $('#rc_' + identity + model).prop('checked', true) }
+    }
 
     // make character assignments matrix visible if the preset had some
     $('#character_selection_matrix').collapse('show');
@@ -236,43 +250,56 @@ function applyPreset(preset) {
 
   // Boss Rando options
   const hasROFlag = ((flag) => {
-    let missing = settingsDefaults.ro_settings.flags.includes(flag);
+    const missing = settingsDefaults.ro_settings.flags.includes(flag);
     if(!preset.settings.ro_settings) { return missing; }
     if(!preset.settings.ro_settings.flags) { return missing; }
     return preset.settings.ro_settings.flags.includes(flag);
   });
-  Object.entries(enumsMap.roflags).forEach(([id, flag]) => {
+
+  for (const [id, flag] of Object.entries(enumsMap.roflags)) {
     $('#id_' + id).prop('checked', hasROFlag(flag)).change();
-  });
+  }
 
   // Mystery Seed options
   const mysterySetting = ((field, key) => {
-    let missing = settingsDefaults.mystery_settings[field][key];
-    if(!preset.settings.mystery_settings) { return missing; }
-    if(!preset.settings.mystery_settings[field]) { return missing; }
-    return preset.settings.mystery_settings[field][key] ?? missing;
+    const missing = settingsDefaults.mystery_settings[field][key];
+    if(!preset.settings.mystery_settings) { return [null, missing]; }
+    if(!preset.settings.mystery_settings[field]) { return [null, missing]; }
+    return [preset.settings.mystery_settings[field][key], missing];
   });
 
-  Object.entries(mysterySliders).forEach(([id, [field, key]]) => setSlider(id, mysterySetting(field, key)));
-  Object.entries(mysteryFlagSliders).forEach(([id, key]) => {
-    let value = 100 * mysterySetting('flag_prob_dict', enumsMap.gameflags[key]);
-    setSlider(id, value, '%');
-  });
+  for (const [id, [field, key]] of Object.entries(mysterySliders)) {
+    const [value, missing] = mysterySetting(field, key);
+    setSlider(id, parseInt(value) || missing);
+  }
+  for (const [id, key] of Object.entries(mysteryFlagSliders)) {
+    const [value, missing] = mysterySetting('flag_prob_dict', enumsMap.gameflags[key]);
+    setSlider(id, 100 * (parseFloat(value) || missing));
+  }
 
   // Bucket Settings
   const bucketSetting = ((key) => {
-    let missing = settingsDefaults.bucket_settings[key]
+    const missing = settingsDefaults.bucket_settings[key]
     if(!preset.settings.bucket_settings) { return missing; }
-    return preset.settings.bucket_settings[key] ?? missing;
+    const lookup = preset.settings.bucket_settings[key] ?? missing;
+
+    // if wrong type (like a string for num objectives), use default
+    // TODO: this could be handled by validation prior to applyPreset
+    return (typeof(lookup) == typeof(missing)) ? lookup : missing;
   });
-  setSlider('bucket_num_objs', bucketSetting('num_objectives'));
-  setSlider('bucket_num_objs_req', bucketSetting('num_objectives_needed'));
+  const maxObjs = 8;
+  const numObjs = Math.max(1, Math.min(bucketSetting('num_objectives'), maxObjs));
+  setSlider('bucket_num_objs', numObjs);
+  setSlider('bucket_num_objs_req', Math.max(1, Math.min(bucketSetting('num_objectives_needed'), numObjs)));
   $('#id_bucket_disable_go_modes').prop('checked', bucketSetting('disable_other_go_modes')).change();
   $('#id_bucket_obj_win_game').prop('checked', bucketSetting('objectives_win')).change();
+  adjustObjectiveEntries();
 
   // read objective hints from preset
-  let hints = bucketSetting('hints') ?? [];
-  [...Array(8).keys()].forEach((index) => $('#id_obhint_entry' + (index + 1)).val(hints[index] ?? '').change());
+  const hints = bucketSetting('hints') || [];
+  for (const index of [...Array(8).keys()]) {
+    $('#id_obhint_entry' + (index + 1)).val(hints[index] ?? '').change();
+  }
 
   // reset spoiler log and differential preset flags whenever a preset is applied (or "reset all" run)
   $('#id_spoiler_log').prop('checked', true).change();
@@ -283,9 +310,9 @@ function applyPreset(preset) {
  * Import preset from uploaded preset JSON.
  */
 function importPreset() {
-  let errElem = document.getElementById('id_invalid_preset_file');
+  const errElem = document.getElementById('id_invalid_preset_file');
 
-  let reader = new FileReader();
+  const reader = new FileReader();
   reader.onload = (event) => {
     let preset = {};
 
@@ -306,7 +333,7 @@ function importPreset() {
   };
   reader.onerror = () => { errElem.innerHTML = reader.error; }
 
-  let preset_file = document.getElementById('id_preset_file').files[0];
+  const preset_file = document.getElementById('id_preset_file').files[0];
   reader.readAsText(preset_file);
 }
 
@@ -326,18 +353,18 @@ function loadSelectedPreset() {
  * Check all of the character rando assignment boxes.
  */
 function rcCheckAll() {
-  charIdentities.forEach((identity) => {
-    charModels.forEach((model) => $('#rc_' + identity + model).prop('checked', true));
-  });
+  for (const identity of charIdentities) {
+    for (const model of charModels) { $('#rc_' + identity + model).prop('checked', true) }
+  }
 }
 
 /*
  * Uncheck all of the character rando assignment boxes.
  */
 function rcUncheckAll() {
-  charIdentities.forEach((identity) => {
-    charModels.forEach((model) => $('#rc_' + identity + model).prop('checked', false));
-  });
+  for (const identity of charIdentities) {
+    for (const model of charModels) { $('#rc_' + identity + model).prop('checked', false) }
+  }
 }
 
 /*
@@ -434,18 +461,18 @@ function toggleFlagsRelated(id) {
   if(toggleOn) {
     // flag is on, clear any restricted flags from "forced on"
     forcedOn = forcedFlagsMap.forced_on[flag] ?? [];
-    forcedOn.forEach((flag) => {
+    for (const flag of forcedOn) {
       unrestrictFlag(flag);
       let elem = $('#id_' + invEnumsMap.gameflags[flag]);
       if(!elem.prop('checked')) { elem.prop('checked', true).change() }
-    });
+    }
 
     // restrict all from "forced off"
-    forcedOff.forEach((flag) => restrictFlag(flag));
+    for (const flag of forcedOff) { restrictFlag(flag) }
   } else {
     // flag is off, clear any restricted flags from "forced off"
     forcedOff = forcedFlagsMap.forced_off[flag] ?? [];
-    forcedOff.forEach((flag) => unrestrictFlag(flag));
+    for (const flag of forcedOff) { unrestrictFlag(flag) }
   }
 
   return [forcedOn, forcedOff];
@@ -456,22 +483,23 @@ function toggleModeRelated() {
   const selectedGameMode = enumsMap.game_mode[selectedMode];
 
   // clear all restricted flags from all non-selected games modes "forced off"
-  Object.keys(enumsMap.game_mode).filter((mode) => mode != selectedMode).forEach((mode) => {
-    let gameMode = enumsMap.game_mode[mode];
-    let forcedOff = forcedFlagsMap.forced_off[gameMode] ?? [];
-    forcedOff.forEach((flag) => unrestrictFlag(flag));
-  });
+  const otherModes = Object.keys(enumsMap.game_mode).filter((mode) => mode != selectedMode);
+  for (const mode of otherModes) {
+    const gameMode = enumsMap.game_mode[mode];
+    const forcedOff = forcedFlagsMap.forced_off[gameMode] ?? [];
+    for (const flag of forcedOff) { unrestrictFlag(flag) }
+  }
 
   // set "forced on" flags for this game mode
-  let forcedOn = forcedFlagsMap.forced_on[selectedGameMode] ?? [];
-  forcedOn.forEach((flag) => {
+  const forcedOn = forcedFlagsMap.forced_on[selectedGameMode] ?? [];
+  for (const flag of forcedOn) {
     unrestrictFlag(flag);
     $('#id_' + invEnumsMap.gameflags[flag]).prop('checked', true).change();
-  });
+  }
 
   // restrict all flags from "forced off" for this game mode
-  let forcedOff = forcedFlagsMap.forced_off[selectedGameMode] ?? [];
-  forcedOff.forEach((flag) => restrictFlag(flag));
+  const forcedOff = forcedFlagsMap.forced_off[selectedGameMode] ?? [];
+  for (const flag of forcedOff) { restrictFlag(flag) }
 
   return [forcedOn, forcedOff];
 }
@@ -825,21 +853,6 @@ function validateLogicTweaks(){
 }
 
 /*
- * Initialize listeners for UI bottons / options.
- */
-function initButtonsListeners() {
-  const presets  = ['race', 'new_player', 'lost_worlds', 'hard', 'legacy_of_cyrus'];
-  presets.forEach((preset) => $('#id_preset_btn_' + preset).on('click', () => applyPreset(presetsMap[preset])));
-  $('#id_reset_all_btn').on('click', () => resetAll());
-  $('#id_load_preset_btn').on('click', () => loadSelectedPreset());
-  $('#id_preset_file').on('change', () => loadSelectedPreset());
-
-  // char rando tab
-  $('#id_rc_check_all').on('click', () => rcCheckAll());
-  $('#id_rc_uncheck_all').on('click', () => rcUncheckAll());
-}
-
-/*
  * Export form inputs as preset to be encoded into JSON.
  * If strict is false (default), always sets general options, but otherwise only non-default options are exported.
  * When strict is true, export all settings.
@@ -870,12 +883,12 @@ function exportPreset(strict=false) {
 
   // Tabs options
   let tabSettings = {};
-  tabTypes.forEach((tab) => {
-    const max = parseInt($('#id_' + tab + '_tab_max').val());
-    const min = parseInt($('#id_' + tab + '_tab_min').val());
+  for (const tab of tabTypes) {
+    const max = $('#id_' + tab + '_tab_max').val();
+    const min = $('#id_' + tab + '_tab_min').val();
     if(strict || max != settingsDefaults.tab_settings[tab + '_max']) { tabSettings[tab + '_max'] = max }
     if(strict || min != settingsDefaults.tab_settings[tab + '_min']) { tabSettings[tab + '_min'] = min }
-  });
+  }
   // TODO: missing tab scheme, binom_success
   if(strict || Object.keys(tabSettings).length > 0) { settings['tab_settings'] = tabSettings }
 
@@ -905,14 +918,14 @@ function exportPreset(strict=false) {
         mysterySettings[field][key] = value;
       }
     });
-    Object.entries(mysterySliders).forEach(([id, [field, key]]) => {
+    for (const [id, [field, key]] of Object.entries(mysterySliders)) {
       setMysterySetting(field, key, parseInt($('#id_' + id).val()));
-    });
-    Object.entries(mysteryFlagSliders).forEach(([id, key]) => {
-      const value = parseFloat($('#id_' + id).val().replace('%', '')) / 100;
+    }
+    for (const [id, key] of Object.entries(mysteryFlagSliders)) {
+      const value = parseFloat($('#id_' + id).val()) / 100;
       const flag = enumsMap.gameflags[key];
       setMysterySetting('flag_prob_dict', flag, value);
-    });
+    }
     if(strict || Object.keys(mysterySettings).length > 0) { settings['mystery_settings'] = mysterySettings }
   }
 
@@ -936,6 +949,57 @@ function exportPreset(strict=false) {
 }
 
 /*
+ * Initialize the sliders and linked text elements for tab settings.
+ */
+function initTabSliders() {
+  for (const tab of tabTypes) {
+    createMinMaxSlidersPair(tab + '_tab_min', tab + '_tab_max', {min: 1, max: 9});
+  }
+}
+
+/*
+ * Initialize sliders and text for mystery settings.
+ */
+function initMysterySliders() {
+  for (const id of Object.keys(mysterySliders)) { createSlider(id) }
+  for (const id of Object.keys(mysteryFlagSliders)) { createSlider(id) }
+}
+
+/*
+ * Initialize the sliders and linked text elements for bucket settings.
+ */
+function initBucketSliders() {
+  const [
+    [reqObjsSlider, reqObjsText],
+    [numObjsSlider, numObjsText]
+  ] = createMinMaxSlidersPair('bucket_num_objs_req', 'bucket_num_objs', {min: 1, max: 8});
+
+  for (const ev of ['change', 'input']) { reqObjsSlider.addEventListener(ev, adjustObjectiveEntries) }
+  for (const ev of ['change', 'input']) { reqObjsText.addEventListener(ev, adjustObjectiveEntries) }
+  for (const ev of ['change', 'input']) { numObjsSlider.addEventListener(ev, adjustObjectiveEntries) }
+  for (const ev of ['change', 'input']) { numObjsText.addEventListener(ev, adjustObjectiveEntries) }
+
+  adjustObjectiveEntries();
+}
+
+/*
+ * Initialize listeners for UI bottons / options.
+ */
+function initButtonsListeners() {
+  const presets  = ['race', 'new_player', 'lost_worlds', 'hard', 'legacy_of_cyrus'];
+  for (const preset of presets) {
+    $('#id_preset_btn_' + preset).on('click', () => applyPreset(presetsMap[preset]));
+  }
+  $('#id_reset_all_btn').on('click', () => resetAll());
+  $('#id_load_preset_btn').on('click', () => loadSelectedPreset());
+  $('#id_preset_file').on('change', () => loadSelectedPreset());
+
+  // char rando tab
+  $('#id_rc_check_all').on('click', () => rcCheckAll());
+  $('#id_rc_uncheck_all').on('click', () => rcUncheckAll());
+}
+
+/*
  * Initialize listeners for general options and flag toggles.
  */
 function initFlagsListeners() {
@@ -943,17 +1007,17 @@ function initFlagsListeners() {
 
   // find all flags that with a "forced on" or "forced off" relationship (which isn't zero/empty)
   let restrictedFlagIds = new Set();
-  let allFlagIds = Object.keys(enumsMap.gameflags);
-  let allFlags = Object.keys(forcedFlagsMap.forced_on).concat(Object.keys(forcedFlagsMap.forced_off));
+  const allFlagIds = Object.keys(enumsMap.gameflags);
+  const allFlags = Object.keys(forcedFlagsMap.forced_on).concat(Object.keys(forcedFlagsMap.forced_off));
   allFlags.map((flag) => invEnumsMap.gameflags[flag]).filter((id) => {
     return id && allFlagIds.includes(id);
   }).forEach((id) => restrictedFlagIds.add(id));
 
   // add listeners for toggling of all flags that have restrictions ("forced on" or "forced off" relationships)
-  restrictedFlagIds.forEach((id) => $('#id_' + id).on('change', () => toggleFlagsRelated(id)));
+  for (const id of restrictedFlagIds) { $('#id_' + id).on('change', () => toggleFlagsRelated(id)) }
 
   // add additional listeners to enable/disable options
-  optionToggleIds.forEach((id) => $('#id_' + id).on('change', () => toggleOptions(id)));
+  for (const id of optionToggleIds) { $('#id_' + id).on('change', () => toggleOptions(id)) }
 
   // disable duplicate techs when duplicate characters is disabled
   $('#id_duplicate_characters').on('change', disableDuplicateTechs);
@@ -985,8 +1049,8 @@ function initFormListeners() {
  */
 function initAll() {
   toggleModeRelated();
-  optionToggleIds.forEach((option) => toggleOptions(option));
-  Object.keys(enumsMap.gameflags).forEach((flag) => toggleFlagsRelated(flag));
+  for (const option of optionToggleIds) { toggleOptions(option) }
+  for (const flag of Object.keys(enumsMap.gameflags)) { toggleFlagsRelated(flag) }
   disableDuplicateTechs();
   $('#id_disable_glitches').prop('checked', true).change();
   $('#id_fast_tabs').prop('checked', true).change();
@@ -1009,13 +1073,14 @@ function resetAll() {
  */
 function initOnce() {
   // only add listeners once, on page load; don't add again when resetAll called
-  Object.keys(mysterySliders).forEach((id) => createSlider(id));
-  Object.keys(mysteryFlagSliders).forEach((id) => createSlider(id, '%'));
-  tabTypes.forEach((tab) => createMinMaxSlidersPair(tab + '_tab_min', tab + '_tab_max'));
-  createBucketSliders();
+  initTabSliders();
+  initMysterySliders();
+  initBucketSliders();
+
   initButtonsListeners();
-  initFormListeners();
   initFlagsListeners();
+
+  initFormListeners();
 
   // preform intended-to-be-idempotent (re-)initialization
   initAll();
