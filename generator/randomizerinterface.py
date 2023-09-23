@@ -560,8 +560,7 @@ class RandomizerInterface:
 
         :return: Random seed string.
         """
-        with open("names.txt", "r") as names_file:
-            names = names_file.readline().split(',')
+        names = randomizer.read_names()
         return "".join(random.choice(names) for i in range(2))
 
     @staticmethod

@@ -17,6 +17,7 @@ RUN apk update \
     && apk add postgresql-dev gcc python3-dev musl-dev
 
 # install dependencies
+COPY ./constraints.txt .
 COPY ./requirements.txt .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements.txt
 
@@ -47,15 +48,6 @@ RUN pip install --no-cache /wheels/*
 # Copy the web generator repo files into the container
 COPY . $APP_HOME
 RUN chmod +x $APP_HOME/deploy/entrypoint.sh
-
-# Create links needed by the web generator
-# The randomizer looks for these off of the app's running directory
-# so they need to be linked to the web app's basedir.
-RUN ln -s $APP_HOME/jetsoftime/sourcefiles/names.txt $APP_HOME/names.txt && \
-    ln -s $APP_HOME/jetsoftime/sourcefiles/patch.ips $APP_HOME/patch.ips && \
-    ln -s $APP_HOME/jetsoftime/sourcefiles/flux $APP_HOME/flux && \
-    ln -s $APP_HOME/jetsoftime/sourcefiles/patches $APP_HOME/patches && \
-    ln -s $APP_HOME/jetsoftime/sourcefiles/pickles $APP_HOME/pickles
 
 RUN chown -R ctjot:ctjot $APP_HOME
 
