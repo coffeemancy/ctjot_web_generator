@@ -170,9 +170,9 @@ function applyPreset(preset) {
 
   // General options
   const gameOption = ((key) => {
-    const missing = invEnumsMap[key][settingsDefaults[key]];
+    const missing = settingsDefaults[key];
     if(!preset.settings[key]) { return missing; }
-    return invEnumsMap[key][preset.settings[key]] ?? missing;
+    return preset.settings[key] ?? missing;
   });
 
   $('#id_game_mode').val(gameOption('game_mode')).change();
@@ -453,12 +453,11 @@ function toggleFlagsRelated(id) {
 
 function toggleModeRelated() {
   const selectedMode = document.getElementById('id_game_mode').value;
-  const selectedGameMode = enumsMap.game_mode[selectedMode];
+  const selectedGameMode = selectedMode;
 
   // clear all restricted flags from all non-selected games modes "forced off"
-  const otherModes = Object.keys(enumsMap.game_mode).filter((mode) => mode != selectedMode);
-  for (const mode of otherModes) {
-    const gameMode = enumsMap.game_mode[mode];
+  const otherModes = enumsMap.game_mode.filter((mode) => mode != selectedMode);
+  for (const gameMode of otherModes) {
     const forcedOff = forcedFlagsMap.forced_off[gameMode] ?? [];
     for (const flag of forcedOff) { unrestrictFlag(flag) }
   }
@@ -815,11 +814,11 @@ function exportPreset(strict=false) {
   // metadata?
 
   // General options
-  settings['game_mode'] = enumsMap.game_mode[$('#id_game_mode').val()];
-  settings['enemy_difficulty'] = enumsMap.enemy_difficulty[$('#id_enemy_difficulty').val()];
-  settings['item_difficulty'] = enumsMap.item_difficulty[$('#id_item_difficulty').val()];
-  settings['techorder'] = enumsMap.techorder[$('#id_tech_rando').val()];
-  settings['shopprices'] = enumsMap.shopprices[$('#id_shop_prices').val()];
+  settings['game_mode'] = $('#id_game_mode').val();
+  settings['enemy_difficulty'] = $('#id_enemy_difficulty').val();
+  settings['item_difficulty'] = $('#id_item_difficulty').val();
+  settings['techorder'] = $('#id_tech_rando').val();
+  settings['shopprices'] = $('#id_shop_prices').val();
 
   // Flags
   const getCheckedFlags = ((map) => {

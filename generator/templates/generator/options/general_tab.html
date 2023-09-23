@@ -5,11 +5,9 @@
               <div class="form-group mb-4">
                 <label for="{{form.game_mode.id_for_label}}">Game Mode:</label>
                 <select class="form-control" name="{{form.game_mode.name}}" id="{{form.game_mode.id_for_label}}">
-                  <option value="standard" selected>Standard</option>
-                  <option value="lost_worlds">Lost Worlds</option>
-                  <option value="ice_age">Ice Age</option>
-                  <option value="legacy_of_cyrus">Legacy of Cyrus</option>
-                  <option value="vanilla_rando">Vanilla Rando</option>
+                  {% for mode in enums_map.game_mode %}
+                  <option value="{{ mode }}">{{ mode }}</option>
+                  {% endfor %}
                 </select>
               </div>
 
@@ -19,8 +17,9 @@
                   <div class="form-group mb-4">
                     <label for="{{form.enemy_difficulty.id_for_label}}">Enemy Difficulty:</label>
                     <select class="form-control" name="{{form.enemy_difficulty.name}}" id="{{form.enemy_difficulty.id_for_label}}">
-                      <option value="normal" selected>Normal</option>
-                      <option value="hard">Hard</option>
+                      {% for diff in enums_map.enemy_difficulty %}
+                      <option value="{{ diff }}">{{ diff }}</option>
+                      {% endfor %}
                     </select>
                   </div>
 
@@ -65,9 +64,9 @@
                   <div class="form-group mb-4">
                     <label for="{{form.item_difficulty.id_for_label}}">Item Difficulty:</label>
                     <select class="form-control" name="{{form.item_difficulty.name}}" id="{{form.item_difficulty.id_for_label}}">
-                      <option value="easy">Easy</option>
-                      <option value="normal" selected>Normal</option>
-                      <option value="hard">Hard</option>
+                      {% for diff in enums_map.item_difficulty %}
+                      <option value="{{ diff }}">{{ diff }}</option>
+                      {% endfor %}
                     </select>
                   </div>
 
@@ -112,19 +111,18 @@
               <div class="form-group">
                 <label for="{{form.shop_prices.id_for_label}}">Shop Prices:</label>
                 <select class="form-control" name="{{form.shop_prices.name}}" id="{{form.shop_prices.id_for_label}}">
-                  <option value="normal" selected>Normal</option>
-                  <option value="free">Free</option>
-                  <option value="mostly_random">Mostly Random</option>
-                  <option value="fully_random">Fully Random</option>
+                  {% for shopprice in enums_map.shopprices %}
+                  <option value="{{ shopprice }}">{{ shopprice }}</option>
+                  {% endfor %}
                 </select>
               </div>
 
               <div class="form-group">
                 <label for="{{form.tech_rando.id_for_label}}">Tech Randomization:</label>
                 <select class="form-control" name="{{form.tech_rando.name}}" id="{{form.tech_rando.id_for_label}}">
-                  <option value="normal" selected>Normal</option>
-                  <option value="balanced_random">Balanced Random</option>
-                  <option value="full_random">Fully Random</option>
+                  {% for techorder in enums_map.techorder %}
+                  <option value="{{ techorder }}">{{ techorder }}</option>
+                  {% endfor %}
                 </select>
               </div>
             </div> <!-- End Game Flags -->

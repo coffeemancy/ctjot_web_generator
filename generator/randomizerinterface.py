@@ -9,7 +9,7 @@ import sys
 import datetime
 
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 # Web types
 from .forms import GenerateForm, RomForm
@@ -27,84 +27,63 @@ import objectivehints as obhint
 import randoconfig
 import randomizer
 import randosettings as rset
+import validators as vld
 from randosettings import GameFlags as GF
 
 
-# mapping of reference in options.js to randosettings enum value
-enums_map: Dict[str, Dict[str, Any]] = {
-    "game_mode": {
-        "standard": rset.GameMode.STANDARD,
-        "lost_worlds": rset.GameMode.LOST_WORLDS,
-        "ice_age": rset.GameMode.ICE_AGE,
-        "legacy_of_cyrus": rset.GameMode.LEGACY_OF_CYRUS,
-        "vanilla_rando": rset.GameMode.VANILLA_RANDO
-    },
-    "shopprices": {
-        "normal": rset.ShopPrices.NORMAL,
-        "free": rset.ShopPrices.FREE,
-        "mostly_random": rset.ShopPrices.MOSTLY_RANDOM,
-        "fully_random": rset.ShopPrices.FULLY_RANDOM
-    },
-    "item_difficulty": {
-        "easy": rset.Difficulty.EASY,
-        "normal": rset.Difficulty.NORMAL,
-        "hard": rset.Difficulty.HARD
-    },
-    "enemy_difficulty": {
-        "normal": rset.Difficulty.NORMAL,
-        "hard": rset.Difficulty.HARD
-    },
-    "techorder": {
-        "normal": rset.TechOrder.NORMAL,
-        "full_random": rset.TechOrder.FULL_RANDOM,
-        "balanced_random": rset.TechOrder.BALANCED_RANDOM
-    },
+# string representations of randosettings enums used in options.js
+enums_map: Dict[str, Union[List[str], Dict[str, str]]] = {
+    "game_mode": [str(k) for k in list(rset.GameMode)],
+    "shopprices": [str(k) for k in list(rset.ShopPrices)],
+    "item_difficulty": [str(k) for k in list(rset.Difficulty)],
+    "enemy_difficulty": [str(rset.Difficulty.NORMAL), str(rset.Difficulty.HARD)],
+    "techorder": [str(k) for k in list(rset.TechOrder)],
     "gameflags": {
         # Main
-        'disable_glitches': GF.FIX_GLITCH,
-        'boss_rando': GF.BOSS_RANDO,
-        'boss_scaling': GF.BOSS_SCALE,
-        'zeal': GF.ZEAL_END,
-        'early_pendant': GF.FAST_PENDANT,
-        'locked_chars': GF.LOCKED_CHARS,
-        'unlocked_magic': GF.UNLOCKED_MAGIC,
-        'tab_treasures': GF.TAB_TREASURES,
-        'chronosanity': GF.CHRONOSANITY,
-        'char_rando': GF.CHAR_RANDO,
-        'healing_item_rando': GF.HEALING_ITEM_RANDO,
-        'gear_rando': GF.GEAR_RANDO,
-        'mystery_seed': GF.MYSTERY,
-        'epoch_fail': GF.EPOCH_FAIL,
-        'duplicate_characters': GF.DUPLICATE_CHARS,
-        'duplicate_duals': GF.DUPLICATE_TECHS,
+        'disable_glitches': str(GF.FIX_GLITCH),
+        'boss_rando': str(GF.BOSS_RANDO),
+        'boss_scaling': str(GF.BOSS_SCALE),
+        'zeal': str(GF.ZEAL_END),
+        'early_pendant': str(GF.FAST_PENDANT),
+        'locked_chars': str(GF.LOCKED_CHARS),
+        'unlocked_magic': str(GF.UNLOCKED_MAGIC),
+        'tab_treasures': str(GF.TAB_TREASURES),
+        'chronosanity': str(GF.CHRONOSANITY),
+        'char_rando': str(GF.CHAR_RANDO),
+        'healing_item_rando': str(GF.HEALING_ITEM_RANDO),
+        'gear_rando': str(GF.GEAR_RANDO),
+        'mystery_seed': str(GF.MYSTERY),
+        'epoch_fail': str(GF.EPOCH_FAIL),
+        'duplicate_characters': str(GF.DUPLICATE_CHARS),
+        'duplicate_duals': str(GF.DUPLICATE_TECHS),
         # Extra
-        'unlocked_skyways': GF.UNLOCKED_SKYGATES,
-        'add_sunkeep_spot': GF.ADD_SUNKEEP_SPOT,
-        'add_bekkler_spot': GF.ADD_BEKKLER_SPOT,
-        'add_cyrus_spot': GF.ADD_CYRUS_SPOT,
-        'restore_tools': GF.RESTORE_TOOLS,
-        'add_ozzie_spot': GF.ADD_OZZIE_SPOT,
-        'restore_johnny_race': GF.RESTORE_JOHNNY_RACE,
-        'add_racelog_spot': GF.ADD_RACELOG_SPOT,
-        'remove_black_omen_spot': GF.REMOVE_BLACK_OMEN_SPOT,
-        'split_arris_dome': GF.SPLIT_ARRIS_DOME,
-        'vanilla_robo_ribbon': GF.VANILLA_ROBO_RIBBON,
-        'vanilla_desert': GF.VANILLA_DESERT,
-        'use_antilife': GF.USE_ANTILIFE,
-        'tackle_effects': GF.TACKLE_EFFECTS_ON,
-        'starters_sufficient': GF.STARTERS_SUFFICIENT,
-        'bucket_list': GF.BUCKET_LIST,
-        'rocksanity': GF.ROCKSANITY,
-        'tech_damage_rando': GF.TECH_DAMAGE_RANDO,
+        'unlocked_skyways': str(GF.UNLOCKED_SKYGATES),
+        'add_sunkeep_spot': str(GF.ADD_SUNKEEP_SPOT),
+        'add_bekkler_spot': str(GF.ADD_BEKKLER_SPOT),
+        'add_cyrus_spot': str(GF.ADD_CYRUS_SPOT),
+        'restore_tools': str(GF.RESTORE_TOOLS),
+        'add_ozzie_spot': str(GF.ADD_OZZIE_SPOT),
+        'restore_johnny_race': str(GF.RESTORE_JOHNNY_RACE),
+        'add_racelog_spot': str(GF.ADD_RACELOG_SPOT),
+        'remove_black_omen_spot': str(GF.REMOVE_BLACK_OMEN_SPOT),
+        'split_arris_dome': str(GF.SPLIT_ARRIS_DOME),
+        'vanilla_robo_ribbon': str(GF.VANILLA_ROBO_RIBBON),
+        'vanilla_desert': str(GF.VANILLA_DESERT),
+        'use_antilife': str(GF.USE_ANTILIFE),
+        'tackle_effects': str(GF.TACKLE_EFFECTS_ON),
+        'starters_sufficient': str(GF.STARTERS_SUFFICIENT),
+        'bucket_list': str(GF.BUCKET_LIST),
+        'rocksanity': str(GF.ROCKSANITY),
+        'tech_damage_rando': str(GF.TECH_DAMAGE_RANDO),
         # QoL
-        'sightscope_always_on': GF.VISIBLE_HEALTH,
-        'boss_sightscope': GF.BOSS_SIGHTSCOPE,
-        'fast_tabs': GF.FAST_TABS,
-        'free_menu_glitch': GF.FREE_MENU_GLITCH,
+        'sightscope_always_on': str(GF.VISIBLE_HEALTH),
+        'boss_sightscope': str(GF.BOSS_SIGHTSCOPE),
+        'fast_tabs': str(GF.FAST_TABS),
+        'free_menu_glitch': str(GF.FREE_MENU_GLITCH),
     },
     'roflags': {
-        'boss_spot_hp': rset.ROFlags.BOSS_SPOT_HP,
-        'legacy_boss_placement': rset.ROFlags.PRESERVE_PARTS,
+        'boss_spot_hp': str(rset.ROFlags.BOSS_SPOT_HP),
+        'legacy_boss_placement': str(rset.ROFlags.PRESERVE_PARTS),
     }
 }
 
@@ -455,7 +434,7 @@ class RandomizerInterface:
         return json.dumps(data, cls=jotjson.JOTJSONEncoder, indent=None, separators=(',', ':'))
 
     @classmethod
-    def get_enums_map(cls) -> Dict[str, Dict[str, str]]:
+    def get_enums_map(cls) -> Dict[str, Union[List[str], Dict[str, str]]]:
         """
         Get mappings of values used in options.js to string repr of randosettings enums to encode to JSON.
 
@@ -467,8 +446,7 @@ class RandomizerInterface:
 
         :return: mappings of values used in options.js to randosettings enum string representations
         """
-        # coerce all enums to strings to avoid getting int or List representations
-        return {key: {k: str(v) for k, v in mapping.items()} for key, mapping in enums_map.items()}
+        return enums_map
 
     @classmethod
     def get_forced_flags_json(cls) -> str:
@@ -486,16 +464,18 @@ class RandomizerInterface:
     @classmethod
     def get_inv_enums_map(cls) -> Dict[str, Dict[str, str]]:
         """
-        Get inverted enums map, with mappings of string repr of randosettings enums mapped to options.js values.
+        Get inverted flags map, with mappings of string repr of randosettings flag enums mapped to options.js values.
 
-        This is enums map, but each nested dictionary is inverted, so the values and keys are swapped.
+        This is the flags from enums_map, but each dictionary is inverted, so the values and keys are swapped.
         This is used in options.js to do lookups for string representations of randosettings enums based
         on the values of selections or toggles in the web UI.
 
         :return: mappings of andosettings enum string representations to values used in options.js
         """
-        # coerce all enums to strings to avoid getting int or List representations
-        return {key: {str(v): k for k, v in mapping.items()} for key, mapping in enums_map.items()}
+        return {
+            key: {str(v): k for k, v in mapping.items()}
+            for key, mapping in enums_map.items() if isinstance(mapping, Dict)
+        }
 
     @staticmethod
     def get_obhint_map() -> OrderedDict[str, str]:
