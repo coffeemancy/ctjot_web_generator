@@ -67,9 +67,6 @@ class GenerateForm(forms.Form):
     game_mode = forms.CharField(max_length=15)
 
     # Character rando tab
-    char_rando_assignments = forms.CharField(
-        widget=forms.HiddenInput(), required=False
-    )
     duplicate_characters = forms.BooleanField(required=False)
     duplicate_duals = forms.BooleanField(required=False)
 
@@ -107,6 +104,7 @@ class GenerateForm(forms.Form):
     add_ozzie_spot = forms.BooleanField(required=False)
     restore_johnny_race = forms.BooleanField(required=False)
     add_racelog_spot = forms.BooleanField(required=False)
+    remove_black_omen_spot = forms.BooleanField(required=False)
     split_arris_dome = forms.BooleanField(required=False)
     rocksanity = forms.BooleanField(required=False)
     vanilla_robo_ribbon = forms.BooleanField(required=False)
@@ -122,6 +120,7 @@ class GenerateForm(forms.Form):
     mystery_game_mode_lw = forms.IntegerField()
     mystery_game_mode_loc = forms.IntegerField()
     mystery_game_mode_ia = forms.IntegerField()
+    mystery_game_mode_vr = forms.IntegerField()
     #  Item Difficulty
     mystery_item_difficulty_easy = forms.IntegerField()
     mystery_item_difficulty_normal = forms.IntegerField()
@@ -158,12 +157,7 @@ class GenerateForm(forms.Form):
     bucket_disable_go_modes = forms.BooleanField(required=False)
     bucket_obj_win_game = forms.BooleanField(required=False)
 
-    bucket_objective1 = forms.CharField(required=False)
-    bucket_objective2 = forms.CharField(required=False)
-    bucket_objective3 = forms.CharField(required=False)
-    bucket_objective4 = forms.CharField(required=False)
-    bucket_objective5 = forms.CharField(required=False)
-    bucket_objective6 = forms.CharField(required=False)
-    bucket_objective7 = forms.CharField(required=False)
-    bucket_objective8 = forms.CharField(required=False)
-
+    # presets
+    preset_selection = forms.CharField(max_length=25, required=False)
+    preset_file = forms.FileField(required=False)
+    preset = forms.CharField(widget=forms.HiddenInput(), required=True)

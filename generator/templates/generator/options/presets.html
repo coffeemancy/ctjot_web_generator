@@ -1,0 +1,37 @@
+      <div class="border border-primary rounded p-2">
+
+        <div class="form-row">
+          <div class="col">
+            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_reset_all_btn" title="Reset all selections to default settings.">Reset All</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_preset_btn_race" title="Apply settings for 'Race' preset.">Race</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_preset_btn_new_player" title="Apply settings for 'New Player' preset.">New Player</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_preset_btn_lost_worlds" title="Apply settings for 'Lost Worlds' preset.">Lost Worlds</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_preset_btn_hard" title="Apply settings for 'Hard' preset.">Hard</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_preset_btn_legacy_of_cyrus" title="Apply settings for 'Legacy of Cyrus' preset.">Legacy of Cyrus</button>
+            <button class="btn btn-primary mt-1 mb-1" type="button" id="id_load_preset_btn" title="Upload your own custom preset JSON file.">Upload Preset</button>
+          </div>
+
+          <div class="w-100"></div>
+
+          <div class="col p-2">
+            <div id="id_preset_metadata"></div>
+          </div>
+
+          <div class="w-100"></div>
+
+          <!-- Preset upload -->
+          <div class="col align-self-end collapse custom-preset-collapse">
+            <div class="input-group mb-2">
+              <div class="input-group-prepend">
+                <div class="input-group-text">Upload Preset</div>
+              </div>
+              <input type="file" accept="application/JSON" class="form-control-file form-control" id="{{form.preset_file.id_for_label}}" name="{{form.preset_file.name}}">
+            </div>
+          </div>
+          <div class="w-100"></div>
+          <div class="col">
+            <div class="bg-danger" id="id_invalid_preset_file"></div>
+          </div>
+        </div>
+
+      </div>

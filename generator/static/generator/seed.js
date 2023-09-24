@@ -1,18 +1,20 @@
+/* global Cookies */
+
 // Change the spoiler log button between "Show" and "Hide"
-$(document).on('show.bs.collapse', '#spoiler_section', function(e) {
+$(document).on('show.bs.collapse', '#spoiler_section', function() {
   document.getElementById('spoiler_log_button').value = 'Hide Spoiler Log';
 });
 
-$(document).on('hide.bs.collapse', '#spoiler_section', function(e) {
+$(document).on('hide.bs.collapse', '#spoiler_section', function() {
   document.getElementById('spoiler_log_button').value = 'Show Spoiler Log';
 });
 
 // Change the cosmetic options button between "Show" and "Hide"
-$(document).on('show.bs.collapse', '#cosmetic_section', function(e) {
+$(document).on('show.bs.collapse', '#cosmetic_section', function() {
   document.getElementById('cosmetic_options_button').value = 'Hide Cosmetic Options';
 });
 
-$(document).on('hide.bs.collapse', '#cosmetic_section', function(e) {
+$(document).on('hide.bs.collapse', '#cosmetic_section', function() {
   document.getElementById('cosmetic_options_button').value = 'Show Cosmetic Options';
 });
 
@@ -27,7 +29,7 @@ function getCosmeticOptions() {
  * Update the game options section of the seed page.
  */
 function updateGameOptions() {
-  let options = getCosmeticOptions();
+  const options = getCosmeticOptions();
 
   // Update the slider text boxes
   Object.entries(options).forEach(([id, option]) => {
@@ -37,17 +39,18 @@ function updateGameOptions() {
   });
 
   // Display the chosen background type.
-  var selection = document.getElementById('id_background_selection').value;
-  preview = document.getElementById('background_selection_preview');
+  const selection = document.getElementById('id_background_selection').value;
+  const preview = document.getElementById('background_selection_preview');
   preview.className = 'menuBackground' + selection;
 }
 
+/* exported loadCosmeticOptionsCookie */
 /*
  * Load cosmetic options from cookie.
  */
 function loadCosmeticOptionsCookie() {
   // load cookie
-  let cookie = Cookies.get('ctjot_cosmetics');
+  const cookie = Cookies.get('ctjot_cosmetics');
   if (!cookie) { return; }
 
   try {
@@ -58,7 +61,7 @@ function loadCosmeticOptionsCookie() {
   if (!cosmetics) { return; }
 
   // update items from cookie
-  let options = getCosmeticOptions();
+  const options = getCosmeticOptions();
   Object.entries(options).forEach(([id, option]) => {
     let elem = document.getElementById("id_" + id);
     if (elem) {
@@ -77,6 +80,7 @@ function loadCosmeticOptionsCookie() {
   updateGameOptions();
 }
 
+/* exported saveCosmeticOptionsCookie */
 /*
  * Save cosmetic options to cookie.
  */
@@ -103,6 +107,7 @@ function saveCosmeticOptionsCookie() {
   }
 }
 
+/* exported resetCosmeticOptionsCookie */
 /*
  * Reset cosmetic options to defaults and clear cookie.
  */

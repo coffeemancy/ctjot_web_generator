@@ -19,13 +19,15 @@ import io
 import json
 import pickle
 import random
-import base64
 
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict
 
 # Other libraries
 import nanoid
 from PIL import Image, ImageDraw
+
+if TYPE_CHECKING:
+    from django.core.files.uploadfile import UploadedFile
 
 
 class InvalidRomException(Exception):
@@ -53,7 +55,15 @@ class OptionsView(View):
     @classmethod
     def get(cls, request):
         form = GenerateForm()
-        context = {'form': form}
+        context = {
+            'form': form,
+            'enums_map': RandomizerInterface.get_enums_map(),
+            'forced_flags_json': RandomizerInterface.get_forced_flags_json(),
+            'inv_enums_map': RandomizerInterface.get_inv_enums_map(),
+            'obhint_map': RandomizerInterface.get_obhint_map(),
+            'presets_map': RandomizerInterface.get_presets_map(),
+            'settings_defaults_json': RandomizerInterface.get_settings_defaults_json(),
+        }
         return render(request, 'generator/options.html', context)
 
 
@@ -79,6 +89,18 @@ class GenerateView(FormView):
         for error in form.errors:
             buffer.write(str(error) + "\n")
         return render(self.request, 'generator/error.html', {'error_text': buffer.getvalue()}, status=404)
+
+
+class DownloadPresetView(GenerateView):
+    def form_valid(self, form):
+        contents = form.cleaned_data['preset']
+        preset = json.loads(contents)
+        response = HttpResponse(content_type='application/json')
+        response.write(contents)
+
+        name = preset.get('metadata', {}).get('name', 'preset').lower().replace(' ', '-')
+        response['Content-Disposition'] = f"attachment; filename={name}.preset.json"
+        return response
 
 
 class ShareLinkView(View):
@@ -118,7 +140,7 @@ class DownloadSeedView(FormView):
     form_class = RomForm
 
     @classmethod
-    def read_and_validate_rom_file(cls, rom_file: bytearray):
+    def read_and_validate_rom_file(cls, rom_file: 'UploadedFile'):
         """
         Read and validate the user's ROM file.
 
@@ -127,7 +149,7 @@ class DownloadSeedView(FormView):
         is too large to be a valid ROM file.
 
         :param rom_file: File object containing a user's ROM
-        :return: bytearray containing ROM data
+        :return: UploadedFile containing ROM data (bytearray)
         """
         # Validate that the file isn't too large to be a CT ROM.
         # Don't waste time reading it if it's not a CT ROM.
@@ -191,9 +213,9 @@ class DownloadSpoilerLogView(View):
         if not game.race_seed:
             spoiler_log = RandomizerInterface.get_spoiler_log(
                 pickle.loads(game.configuration), pickle.loads(game.settings), game.seed_hash)
-            file_name = 'spoiler_log_' + share_id + '.txt'
+            file_name = f"spoiler_log_{share_id}.txt"
             response = HttpResponse(content_type='text/plain')
-            response['Content-Disposition'] = 'attachment; filename=%s' % file_name
+            response['Content-Disposition'] = f"attachment; filename={file_name}"
             response.write(spoiler_log.getvalue())
             return response
         else:
@@ -212,13 +234,16 @@ class DownloadJSONSpoilerLogView(View):
         except Game.DoesNotExist:
             return render(request, 'generator/error.html', {'error_text': 'Seed does not exist.'}, status=404)
 
-        response = HttpResponse(content_type='application/json')
+        file_name = f"spoiler_log_{share_id}.json"
+        contents = b'{"cheating": "not_allowed"}'
         if not game.race_seed:
             spoiler_log = RandomizerInterface.get_json_spoiler_log(
                 pickle.loads(game.configuration), pickle.loads(game.settings), game.seed_hash)
-            response.write(spoiler_log.getvalue())
-        else:
-            response.write(b'{"cheating": "not_allowed"}')
+            contents = spoiler_log.getvalue()
+
+        response = HttpResponse(content_type='application/json')
+        response.write(contents)
+        response['Content-Disposition'] = f"attachment; filename={file_name}"
         return response
 
 
@@ -233,12 +258,18 @@ class PracticeSeedView(View):
         except InvalidGameIdException as e:
             return render(request, 'generator/error.html', {'error_text': str(e)}, status=404)
         except InvalidSettingsException as e:
-            return render(request, 'generator/error.html', {'error_text': str(e)}, status=404)
+            return render(request, 'generator/error.html', {'error_text': str(e)}, status=400)
 
         return redirect('/share/' + game.share_id)
 
 
-hashsymbols = base64.b64decode('R0lGODlhYAAIAPEDABggKIiQkPj4+AAAACH5BAUAAAMALAAAAABgAAgAQALTBIYpNwbSVkIvnCPkpMv6LFiJwxjNdQUhA4Iioo3qY8xx9AxLF0LcHOkFhriJSiUEIDMWGqcSOh6WIuUtMishSzwVVlKCIpuG0GBpZqo7R4lQ2gJxK2Wur6HjVkfdk3zilEeSUwHUMHbR8gLGyMBXw2QV8xAJ0eP4yBZXhXjGVhGk8baigGl1QWEok2FSBvKzU9Zm4+jQc2k1tEIDSano+idT1agV6Wtxh9XUxvpUqtQEIcm5QDcqYvNCgWPmjCe9EY6nhCl+ireBQlHrMEIy4j5QAAA7')
+hashsymbols = base64.b64decode(
+    'R0lGODlhYAAIAPEDABggKIiQkPj4+AAAACH5BAUAAAMALAAAAABgAAgAQALTBIYpNwbSVkIvnCPkpMv6LFiJwxjNdQUhA4Iioo3qY8xx'
+    '9AxLF0LcHOkFhriJSiUEIDMWGqcSOh6WIuUtMishSzwVVlKCIpuG0GBpZqo7R4lQ2gJxK2Wur6HjVkfdk3zilEeSUwHUMHbR8gLGyMBX'
+    'w2QV8xAJ0eP4yBZXhXjGVhGk8baigGl1QWEok2FSBvKzU9Zm4+jQc2k1tEIDSano+idT1agV6Wtxh9XUxvpUqtQEIcm5QDcqYvNCgWPm'
+    'jCe9EY6nhCl+ireBQlHrMEIy4j5QAAA7'
+)
+
 
 class SeedImageView(View):
     """
@@ -260,18 +291,20 @@ class SeedImageView(View):
             game.save()
 
         rgen = random.Random(share_id)
-        img = Image.new('RGB', (200,200))
+        img = Image.new('RGB', (200, 200))
 
         d = ImageDraw.Draw(img)
         squaresize = 50
-        for x in range(0,200,squaresize):
+        for x in range(0, 200, squaresize):
             for y in range(0, 200, squaresize):
                 # Draw a square in a random color
-                d.polygon([(x,y),(x+squaresize,y),(x+squaresize,y+squaresize),(x,y+squaresize)],
-                        fill=(rgen.randint(0,31)*8, rgen.randint(0,31)*8, rgen.randint(0,31)*8))
+                d.polygon(
+                    [(x, y), (x+squaresize, y), (x+squaresize, y+squaresize), (x, y+squaresize)],
+                    fill=(rgen.randint(0, 31)*8, rgen.randint(0, 31)*8, rgen.randint(0, 31)*8)
+                )
 
         # make a black box to put symbols onto
-        d.polygon([(2,85),(198,85),(198,115),(2,115)], fill=(0,0,0))
+        d.polygon([(2, 85), (198, 85), (198, 115), (2, 115)], fill=(0, 0, 0))
 
         # put seed hash symbols into box
         symbols = Image.open(io.BytesIO(hashsymbols))
@@ -280,8 +313,8 @@ class SeedImageView(View):
             idx = int.from_bytes(byte, 'big') - 0x20
             if idx > 0x9:
                 idx = idx - 0x4
-            symb = symbols.resize((24,24), box=(8*idx,0,8*idx+8,8))
-            img.paste(symb, (4+n*24,88))
+            symb = symbols.resize((24, 24), box=(8*idx, 0, 8*idx+8, 8))
+            img.paste(symb, (4+n*24, 88))
 
         with io.BytesIO() as f:
             img.save(f, 'PNG')
@@ -375,7 +408,7 @@ def get_cosmetics(request: HttpRequest) -> Dict[str, Dict[str, Any]]:
     :param: request: HTTP request object passed from view to read cookie.
     :return: Nested dictionary mapping of cosmetic options
     """
-    cosmetics = {
+    cosmetics: Dict[str, Dict[str, Any]] = {
         # general cosmetics
         'reduce_flashes': {'default': False, 'type': 'checked'},
         'quiet_mode': {'default': False, 'type': 'checked'},

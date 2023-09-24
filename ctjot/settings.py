@@ -30,7 +30,7 @@ DEBUG = int(os.environ.get("DEBUG", "0"))
 if os.environ.get("DJANGO_ALLOWED_HOSTS") is None:
     ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 else:
-    ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS").split(" ")
+    ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(" ")
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
@@ -142,4 +142,4 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_METHODS = ["GET", "OPTIONS"]
-CORS_URLS_REGEX = r"^/spoiler_log/.*\.json$"
+CORS_URLS_REGEX = r"^/download/.*\.json$"

@@ -1,11 +1,15 @@
 # Python types
 from __future__ import annotations
 import io
+import json
 import os.path
 import random
 import re
 import sys
 import datetime
+
+from collections import OrderedDict
+from typing import Any, Dict, List, Optional, Union
 
 # Web types
 from .forms import GenerateForm, RomForm
@@ -16,39 +20,71 @@ from django.conf import settings as conf
 sys.path.append(os.path.join(conf.BASE_DIR, 'jetsoftime', 'sourcefiles'))
 
 # Randomizer types
-import ctenums
 import bossrandotypes as rotypes
+import jotjson
 import logicwriters as logicwriter
+import objectivehints as obhint
 import randoconfig
 import randomizer
 import randosettings as rset
+import validators as vld
+from randosettings import GameFlags as GF
 
 
-game_mode_map = {
-    "standard": rset.GameMode.STANDARD,
-    "lost_worlds": rset.GameMode.LOST_WORLDS,
-    "ice_age": rset.GameMode.ICE_AGE,
-    "legacy_of_cyrus": rset.GameMode.LEGACY_OF_CYRUS,
-    "vanilla_rando": rset.GameMode.VANILLA_RANDO
-}
-
-shop_price_map = {
-    "normal": rset.ShopPrices.NORMAL,
-    "free": rset.ShopPrices.FREE,
-    "mostly_random": rset.ShopPrices.MOSTLY_RANDOM,
-    "fully_random": rset.ShopPrices.FULLY_RANDOM
-}
-
-difficulty_map = {
-    "easy": rset.Difficulty.EASY,
-    "normal": rset.Difficulty.NORMAL,
-    "hard": rset.Difficulty.HARD
-}
-
-tech_order_map = {
-    "normal": rset.TechOrder.NORMAL,
-    "fully_random": rset.TechOrder.FULL_RANDOM,
-    "balanced_random": rset.TechOrder.BALANCED_RANDOM
+# string representations of randosettings enums used in options.js
+enums_map: Dict[str, Union[List[str], Dict[str, str]]] = {
+    "game_mode": [str(k) for k in list(rset.GameMode)],
+    "shopprices": [str(k) for k in list(rset.ShopPrices)],
+    "item_difficulty": [str(k) for k in list(rset.Difficulty)],
+    "enemy_difficulty": [str(rset.Difficulty.NORMAL), str(rset.Difficulty.HARD)],
+    "techorder": [str(k) for k in list(rset.TechOrder)],
+    "gameflags": {
+        # Main
+        'disable_glitches': str(GF.FIX_GLITCH),
+        'boss_rando': str(GF.BOSS_RANDO),
+        'boss_scaling': str(GF.BOSS_SCALE),
+        'zeal': str(GF.ZEAL_END),
+        'early_pendant': str(GF.FAST_PENDANT),
+        'locked_chars': str(GF.LOCKED_CHARS),
+        'unlocked_magic': str(GF.UNLOCKED_MAGIC),
+        'tab_treasures': str(GF.TAB_TREASURES),
+        'chronosanity': str(GF.CHRONOSANITY),
+        'char_rando': str(GF.CHAR_RANDO),
+        'healing_item_rando': str(GF.HEALING_ITEM_RANDO),
+        'gear_rando': str(GF.GEAR_RANDO),
+        'mystery_seed': str(GF.MYSTERY),
+        'epoch_fail': str(GF.EPOCH_FAIL),
+        'duplicate_characters': str(GF.DUPLICATE_CHARS),
+        'duplicate_duals': str(GF.DUPLICATE_TECHS),
+        # Extra
+        'unlocked_skyways': str(GF.UNLOCKED_SKYGATES),
+        'add_sunkeep_spot': str(GF.ADD_SUNKEEP_SPOT),
+        'add_bekkler_spot': str(GF.ADD_BEKKLER_SPOT),
+        'add_cyrus_spot': str(GF.ADD_CYRUS_SPOT),
+        'restore_tools': str(GF.RESTORE_TOOLS),
+        'add_ozzie_spot': str(GF.ADD_OZZIE_SPOT),
+        'restore_johnny_race': str(GF.RESTORE_JOHNNY_RACE),
+        'add_racelog_spot': str(GF.ADD_RACELOG_SPOT),
+        'remove_black_omen_spot': str(GF.REMOVE_BLACK_OMEN_SPOT),
+        'split_arris_dome': str(GF.SPLIT_ARRIS_DOME),
+        'vanilla_robo_ribbon': str(GF.VANILLA_ROBO_RIBBON),
+        'vanilla_desert': str(GF.VANILLA_DESERT),
+        'use_antilife': str(GF.USE_ANTILIFE),
+        'tackle_effects': str(GF.TACKLE_EFFECTS_ON),
+        'starters_sufficient': str(GF.STARTERS_SUFFICIENT),
+        'bucket_list': str(GF.BUCKET_LIST),
+        'rocksanity': str(GF.ROCKSANITY),
+        'tech_damage_rando': str(GF.TECH_DAMAGE_RANDO),
+        # QoL
+        'sightscope_always_on': str(GF.VISIBLE_HEALTH),
+        'boss_sightscope': str(GF.BOSS_SIGHTSCOPE),
+        'fast_tabs': str(GF.FAST_TABS),
+        'free_menu_glitch': str(GF.FREE_MENU_GLITCH),
+    },
+    'roflags': {
+        'boss_spot_hp': str(rset.ROFlags.BOSS_SPOT_HP),
+        'legacy_boss_placement': str(rset.ROFlags.PRESERVE_PARTS),
+    }
 }
 
 
@@ -154,7 +190,9 @@ class RandomizerInterface:
         if not self.randomizer.has_generated:
             self.randomizer.hash_string_bytes = hash_bytes
 
-    def set_settings_and_config(self, settings: rset.Settings, config: randoconfig.RandoConfig, form: Optional[RomForm]):
+    def set_settings_and_config(
+        self, settings: rset.Settings, config: randoconfig.RandoConfig, form: Optional[RomForm]
+    ):
         """
         Populate the randomizer with a pre-populated RandoSettings object and a
         preconfigured RandoSettings object.
@@ -181,14 +219,14 @@ class RandomizerInterface:
             settings.cosmetic_flags = cos_flags
 
             # Character/Epoch renames
-            settings.char_names[0] = self.get_character_name(form.cleaned_data['crono_name'], 'Crono')
-            settings.char_names[1] = self.get_character_name(form.cleaned_data['marle_name'], 'Marle')
-            settings.char_names[2] = self.get_character_name(form.cleaned_data['lucca_name'], 'Lucca')
-            settings.char_names[3] = self.get_character_name(form.cleaned_data['robo_name'], 'Robo')
-            settings.char_names[4] = self.get_character_name(form.cleaned_data['frog_name'], 'Frog')
-            settings.char_names[5] = self.get_character_name(form.cleaned_data['ayla_name'], 'Ayla')
-            settings.char_names[6] = self.get_character_name(form.cleaned_data['magus_name'], 'Magus')
-            settings.char_names[7] = self.get_character_name(form.cleaned_data['epoch_name'], 'Epoch')
+            settings.char_settings.names[0] = self.get_character_name(form.cleaned_data['crono_name'], 'Crono')
+            settings.char_settings.names[1] = self.get_character_name(form.cleaned_data['marle_name'], 'Marle')
+            settings.char_settings.names[2] = self.get_character_name(form.cleaned_data['lucca_name'], 'Lucca')
+            settings.char_settings.names[3] = self.get_character_name(form.cleaned_data['robo_name'], 'Robo')
+            settings.char_settings.names[4] = self.get_character_name(form.cleaned_data['frog_name'], 'Frog')
+            settings.char_settings.names[5] = self.get_character_name(form.cleaned_data['ayla_name'], 'Ayla')
+            settings.char_settings.names[6] = self.get_character_name(form.cleaned_data['magus_name'], 'Magus')
+            settings.char_settings.names[7] = self.get_character_name(form.cleaned_data['epoch_name'], 'Epoch')
 
             # In-game options
             # Boolean options
@@ -263,8 +301,8 @@ class RandomizerInterface:
         :param form: GenerateForm object from the web interface
         :return: RandoSettings object with flags/settings from the form applied
         """
-
-        settings = rset.Settings()
+        # preset data is passed as JSON in hidden CharField
+        settings = rset.Settings.from_preset_data(form.cleaned_data['preset'])
 
         # Seed
         if form.cleaned_data['seed'] == "":
@@ -273,185 +311,13 @@ class RandomizerInterface:
         else:
             settings.seed = form.cleaned_data['seed']
 
-        # Difficulties
-        settings.item_difficulty = difficulty_map[form.cleaned_data['item_difficulty']]
-        settings.enemy_difficulty = difficulty_map[form.cleaned_data['enemy_difficulty']]
-
-        # game mode
-        settings.game_mode = game_mode_map[form.cleaned_data['game_mode']]
-
-        # shops
-        settings.shopprices = shop_price_map[form.cleaned_data['shop_prices']]
-
-        # techs
-        settings.techorder = tech_order_map[form.cleaned_data['tech_rando']]
-
-        GF = rset.GameFlags
-        gameflags_dict = {
-            # Main
-            'disable_glitches': GF.FIX_GLITCH,
-            'boss_rando': GF.BOSS_RANDO,
-            'boss_scaling': GF.BOSS_SCALE,
-            'zeal': GF.ZEAL_END,
-            'early_pendant': GF.FAST_PENDANT,
-            'locked_chars': GF.LOCKED_CHARS,
-            'unlocked_magic': GF.UNLOCKED_MAGIC,
-            'tab_treasures': GF.TAB_TREASURES,
-            'chronosanity': GF.CHRONOSANITY,
-            'char_rando': GF.CHAR_RANDO,
-            'healing_item_rando': GF.HEALING_ITEM_RANDO,
-            'gear_rando': GF.GEAR_RANDO,
-            'mystery_seed': GF.MYSTERY,
-            'epoch_fail': GF.EPOCH_FAIL,
-            'duplicate_characters': GF.DUPLICATE_CHARS,
-            'duplicate_duals': GF.DUPLICATE_TECHS,
-            # This should get moved to ROSettings.
-            'boss_spot_hp': GF.BOSS_SPOT_HP,
-            # Extra
-            'unlocked_skyways': GF.UNLOCKED_SKYGATES,
-            'add_sunkeep_spot': GF.ADD_SUNKEEP_SPOT,
-            'add_bekkler_spot': GF.ADD_BEKKLER_SPOT,
-            'add_cyrus_spot': GF.ADD_CYRUS_SPOT,
-            'restore_tools': GF.RESTORE_TOOLS,
-            'add_ozzie_spot': GF.ADD_OZZIE_SPOT,
-            'restore_johnny_race': GF.RESTORE_JOHNNY_RACE,
-            'add_racelog_spot': GF.ADD_RACELOG_SPOT,
-            'split_arris_dome': GF.SPLIT_ARRIS_DOME,
-            'vanilla_robo_ribbon': GF.VANILLA_ROBO_RIBBON,
-            'vanilla_desert': GF.VANILLA_DESERT,
-            'use_antilife': GF.USE_ANTILIFE,
-            'tackle_effects': GF.TACKLE_EFFECTS_ON,
-            'starters_sufficient': GF.STARTERS_SUFFICIENT,
-            'bucket_list': GF.BUCKET_LIST,
-            'rocksanity': GF.ROCKSANITY,
-            'tech_damage_rando': GF.TECH_DAMAGE_RANDO,
-            # QoL
-            'sightscope_always_on': GF.VISIBLE_HEALTH,
-            'boss_sightscope': GF.BOSS_SIGHTSCOPE,
-            'fast_tabs': GF.FAST_TABS,
-            'free_menu_glitch': GF.FREE_MENU_GLITCH,
-        }
-
-        settings.gameflags = GF(False)
-        for name, flag in gameflags_dict.items():
-            if form.cleaned_data[name]:
-                settings.gameflags |= flag
-
-        # Character rando
-        char_choices = []
-        char_rando_assignments = form.cleaned_data['char_rando_assignments']
-
-        # character rando assignments comes in as a stringified hex number.
-        # Decode the hex string into the char_choices list.
-        # Loop through the characters
-        for i in range(7):
-            char_choices.append([])
-            choices = int(char_rando_assignments[(i * 2):(i * 2) + 2], 16)
-            # Loop through the assignments for the current character
-            for j in range(7):
-                if choices & (1 << j) > 0:
-                    char_choices[i].append(j)
-        settings.char_choices = char_choices
-
-        # Boss rando settings
-        # TODO - Boss and location lists are just default for now. Only update the other options.
-        settings.ro_settings.flags = rset.ROFlags(False)
-        if form.cleaned_data['legacy_boss_placement']:
-            settings.ro_settings.flags |= rset.ROFlags.PRESERVE_PARTS
-
-        if form.cleaned_data['boss_spot_hp']:
-            settings.ro_settings.flags |= rset.ROFlags.BOSS_SPOT_HP
-
-        # Tab randomization settings
-        # TODO - Currently defaulting to UNIFORM distribution
-        settings.tab_settings = rset.TabSettings(
-            scheme=rset.TabRandoScheme.UNIFORM,
-            binom_success=.5,
-            power_min=form.cleaned_data['power_tab_min'],
-            power_max=form.cleaned_data['power_tab_max'],
-            magic_min=form.cleaned_data['magic_tab_min'],
-            magic_max=form.cleaned_data['magic_tab_max'],
-            speed_min=form.cleaned_data['speed_tab_min'],
-            speed_max=form.cleaned_data['speed_tab_max']
-        )
-
-        # Bucket Settings
-        disable_other_go_modes = form.cleaned_data['bucket_disable_go_modes']
-        objectives_win = form.cleaned_data['bucket_obj_win_game']
-        num_objectives = form.cleaned_data['bucket_num_objs']
-        num_objectives_needed = form.cleaned_data['bucket_num_objs_req']
-
-        hints = [
-            form.cleaned_data['bucket_objective'+str(ind+1)]
-            for ind in range(num_objectives)
-        ]
-
-        # Hints *should* only be None if bucket_list isn't checked, but let's
-        # be certain.
-        hints = [
-            hint if hint is not None else '' for hint in hints
-        ]
-
-        settings.bucket_settings = rset.BucketSettings(
-            disable_other_go_modes=disable_other_go_modes,
-            objectives_win=objectives_win,
-            num_objectives=num_objectives,
-            num_objectives_needed=num_objectives_needed,
-            hints=hints
-        )
-
-        # Mystery
-        settings.mystery_settings.game_mode_freqs: dict[rset.GameMode, int] = {
-            rset.GameMode.STANDARD: form.cleaned_data['mystery_game_mode_standard'],
-            rset.GameMode.LOST_WORLDS: form.cleaned_data['mystery_game_mode_lw'],
-            rset.GameMode.LEGACY_OF_CYRUS: form.cleaned_data['mystery_game_mode_loc'],
-            rset.GameMode.ICE_AGE: form.cleaned_data['mystery_game_mode_ia']
-        }
-
-        settings.mystery_settings.item_difficulty_freqs: dict[rset.Difficulty, int] = {
-            rset.Difficulty.EASY: form.cleaned_data['mystery_item_difficulty_easy'],
-            rset.Difficulty.NORMAL: form.cleaned_data['mystery_item_difficulty_normal'],
-            rset.Difficulty.HARD: form.cleaned_data['mystery_item_difficulty_hard']
-        }
-
-        settings.mystery_settings.enemy_difficulty_freqs: dict[rset.Difficulty, int] = {
-            rset.Difficulty.NORMAL: form.cleaned_data['mystery_enemy_difficulty_normal'],
-            rset.Difficulty.HARD: form.cleaned_data['mystery_enemy_difficulty_hard']
-        }
-
-        settings.mystery_settings.tech_order_freqs: dict[rset.TechOrder, int] = {
-            rset.TechOrder.NORMAL: form.cleaned_data['mystery_tech_order_normal'],
-            rset.TechOrder.BALANCED_RANDOM: form.cleaned_data['mystery_tech_order_full_random'],
-            rset.TechOrder.FULL_RANDOM: form.cleaned_data['mystery_tech_order_balanced_random']
-        }
-
-        settings.mystery_settings.shop_price_freqs: dict[rset.ShopPrices, int] = {
-            rset.ShopPrices.NORMAL: form.cleaned_data['mystery_shop_prices_normal'],
-            rset.ShopPrices.MOSTLY_RANDOM: form.cleaned_data['mystery_shop_prices_random'],
-            rset.ShopPrices.FULLY_RANDOM: form.cleaned_data['mystery_shop_prices_mostly_random'],
-            rset.ShopPrices.FREE: form.cleaned_data['mystery_shop_prices_free']
-        }
-
-        settings.mystery_settings.flag_prob_dict: dict[rset.GameFlags, int] = {
-            rset.GameFlags.TAB_TREASURES: form.cleaned_data['mystery_tab_treasures']/100,
-            rset.GameFlags.UNLOCKED_MAGIC: form.cleaned_data['mystery_unlock_magic']/100,
-            rset.GameFlags.BUCKET_LIST: form.cleaned_data['mystery_bucket_list']/100,
-            rset.GameFlags.CHRONOSANITY: form.cleaned_data['mystery_chronosanity']/100,
-            rset.GameFlags.BOSS_RANDO: form.cleaned_data['mystery_boss_rando']/100,
-            rset.GameFlags.BOSS_SCALE: form.cleaned_data['mystery_boss_scale']/100,
-            rset.GameFlags.LOCKED_CHARS: form.cleaned_data['mystery_locked_characters']/100,
-            rset.GameFlags.CHAR_RANDO: form.cleaned_data['mystery_char_rando']/100,
-            rset.GameFlags.DUPLICATE_CHARS: form.cleaned_data['mystery_duplicate_characters']/100,
-            rset.GameFlags.EPOCH_FAIL: form.cleaned_data['mystery_epoch_fail']/100,
-            rset.GameFlags.GEAR_RANDO: form.cleaned_data['mystery_gear_rando']/100,
-            rset.GameFlags.HEALING_ITEM_RANDO: form.cleaned_data['mystery_heal_rando']/100
-        }
-
         return settings
     # End __convert_form_to_settings
 
     @classmethod
-    def get_spoiler_log(cls, config: randoconfig.RandoConfig, settings: rset.Settings, hash_bytes: Optional[bytes]) -> io.StringIO:
+    def get_spoiler_log(
+        cls, config: randoconfig.RandoConfig, settings: rset.Settings, hash_bytes: Optional[bytes]
+    ) -> io.StringIO:
         """
         Get a spoiler log file-like object.
 
@@ -471,7 +337,9 @@ class RandomizerInterface:
         return spoiler_log
 
     @classmethod
-    def get_json_spoiler_log(cls, config: randoconfig.RandoConfig, settings: rset.Settings, hash_bytes: Optional[bytes]) -> io.StringIO:
+    def get_json_spoiler_log(
+        cls, config: randoconfig.RandoConfig, settings: rset.Settings, hash_bytes: Optional[bytes]
+    ) -> io.StringIO:
         """
         Get a spoiler log file-like object.
 
@@ -494,14 +362,14 @@ class RandomizerInterface:
     def get_web_spoiler_log(
             settings: rset.Settings,
             config: randoconfig.RandoConfig
-    ) -> dict[str, list[dict[str, str]]]:
+    ) -> Dict[str, List[Dict[str, str]]]:
         """
         Get a dictionary representing the spoiler log data for the given seed.
 
         :param config: RandoConfig object describing the seed
         :return: Dictionary of spoiler data
         """
-        spoiler_log = {
+        spoiler_log: Dict[str, List[Dict[str, str]]] = {
             'characters': [],
             'key_items': [],
             'bosses': [],
@@ -549,10 +417,119 @@ class RandomizerInterface:
         spheres = logicwriter.get_proof_string_from_settings_config(settings, config)
         rgx = re.compile(r'((?P<sphere>GO|(\d?)):\s*)?(?P<desc>.+)')
         for line in spheres.splitlines():
-            spoiler_log['spheres'].append(rgx.search(line).groupdict())
+            if match := rgx.search(line):
+                spoiler_log['spheres'].append(match.groupdict())
 
         return spoiler_log
     # End get_web_spoiler_log
+
+    @staticmethod
+    def _jotjson_encode(data: Dict[str, Any]) -> str:
+        """Encode data into compact JSON using jotjson encoder.
+
+        This is used to convert randosettings objects (Settings, etc.) into JSON to pass to options.js.
+
+        :return: JSON string representation of data encoded via jotjson encoder
+        """
+        return json.dumps(data, cls=jotjson.JOTJSONEncoder, indent=None, separators=(',', ':'))
+
+    @classmethod
+    def get_enums_map(cls) -> Dict[str, Union[List[str], Dict[str, str]]]:
+        """
+        Get mappings of values used in options.js to string repr of randosettings enums to encode to JSON.
+
+        This mapping is used in options.js to covert to/from presets, translating the form values used in JS
+        into string representations of the enums (e.g. for general options like mode, item/enemy difficulty,
+        shop prices, tech orders, etc., as well as game flags). The string representations can be loaded
+        into randosettings objects via corresponding .from_jot_json. Django converts this map to JSON during
+        templating.
+
+        :return: mappings of values used in options.js to randosettings enum string representations
+        """
+        return enums_map
+
+    @classmethod
+    def get_forced_flags_json(cls) -> str:
+        """
+        Get forced flags mapping encoded as compact JSON.
+
+        This mapping has modes/flags mapped to gameflags (under 'forced_off' or 'forced_on').
+        In the web GUI, 'forced_off' flags get forced off and disabled, instead of just relying
+        on fix_flag_conflicts to turn them off (as happens in the CLI).
+
+        :return: ForcedFlags mapping object encoded as JSON.
+        """
+        return cls._jotjson_encode(rset.ForcedFlags)
+
+    @classmethod
+    def get_inv_enums_map(cls) -> Dict[str, Dict[str, str]]:
+        """
+        Get inverted flags map, with mappings of string repr of randosettings flag enums mapped to options.js values.
+
+        This is the flags from enums_map, but each dictionary is inverted, so the values and keys are swapped.
+        This is used in options.js to do lookups for string representations of randosettings enums based
+        on the values of selections or toggles in the web UI.
+
+        :return: mappings of andosettings enum string representations to values used in options.js
+        """
+        return {
+            key: {str(v): k for k, v in mapping.items()}
+            for key, mapping in enums_map.items() if isinstance(mapping, Dict)
+        }
+
+    @staticmethod
+    def get_obhint_map() -> OrderedDict[str, str]:
+        """
+        Get ordered dict of objective hints aliases mapped to objective hint strings.
+
+        :return: OrderedDict of obhint alias strings mapped to obhint strings.
+        """
+        return obhint.get_objective_hint_aliases()
+
+    @staticmethod
+    def get_presets_map() -> OrderedDict[str, Dict[str, Any]]:
+        """
+        Get preset ids mapped to their compact JSON contents.
+
+        This builds a mapping of preset 'id' keys mapped to metadata and compact JSON
+        contents. The keys are used for values in the preset selection dropdown, with
+        descriptions pulled from metadata. Those same keys are used by options.js
+        to load the appropriate preset data from the 'contents', which are rendered
+        into the 'presets-map' JSON script.
+
+        :return: OrderedDict of sorted preset id mapped to metadata and compact JSON contents
+        """
+        presets = [path for path in rset.PRESETS_PATH.rglob('*.preset.json')]
+        preset_map: Dict[str, Dict[str, Any]] = {}
+        for preset in presets:
+            contents = ' '.join(preset.read_text().split())
+            data = json.loads(preset.read_text(), cls=jotjson.JOTJSONDecoder)
+            preset_id = data['metadata']['name'].lower().replace(' ', '_')
+            preset_map[preset_id] = {
+                'metadata': data['metadata'], 'contents': contents
+            }
+        return OrderedDict(sorted(preset_map.items()))
+
+    @classmethod
+    def get_settings_defaults_json(cls) -> str:
+        """
+        Get the default settings object encoded as compact JSON.
+
+        This turns on fast tab and disables glitches by default as well.
+        Even though those are not the defaults in Settings, they are used
+        as "defaults" in the web GUI for improved UX, especially for new
+        players.
+
+        :return: default RandoSettings object encoded as JSON.
+        """
+        settings = rset.Settings()
+
+        # turn on fast tabs and disable glitches by default
+        settings.gameflags |= (
+            rset.GameFlags.FIX_GLITCH | rset.GameFlags.FAST_TABS
+        )
+
+        return cls._jotjson_encode(settings)
 
     @staticmethod
     def get_random_seed() -> str:
@@ -563,9 +540,7 @@ class RandomizerInterface:
 
         :return: Random seed string.
         """
-        with open("names.txt", "r") as names_file:
-            names = names_file.readline()
-            names = names.split(",")
+        names = randomizer.read_names()
         return "".join(random.choice(names) for i in range(2))
 
     @staticmethod
@@ -586,7 +561,9 @@ class RandomizerInterface:
         return rom
 
     @classmethod
-    def get_share_details(cls, config: randoconfig.RandoConfig, settings: rset.Settings, hash_bytes: Optional[bytes]) -> io.StringIO:
+    def get_share_details(
+        cls, config: randoconfig.RandoConfig, settings: rset.Settings, hash_bytes: Optional[bytes]
+    ) -> io.StringIO:
         """
         Get details about a seed for display on the seed share page.  If this is a mystery seed then
         just display "Mystery seed!".
@@ -635,4 +612,3 @@ class RandomizerInterface:
     @staticmethod
     def clamp(value, min_val, max_val):
         return max(min_val, min(value, max_val))
-

@@ -2,21 +2,20 @@
             <div class="tab-content border border-primary rounded p-2 mb-3">
 
               <div class="form-group form-check pt-3 pl-0">
-                <input type="checkbox" name="{{form.duplicate_characters.name}}" id="{{form.duplicate_characters.id_for_label}}" data-toggle="toggle" onchange="disableDuplicateTechs()" />
+                <input type="checkbox" name="{{form.duplicate_characters.name}}" id="{{form.duplicate_characters.id_for_label}}" data-toggle="toggle">
                 <label for="{{form.duplicate_characters.id_for_label}}">Duplicate Characters</label>
               </div>
 
               <div class="form-group form-check pt-3 pl-0">
-                <input type="checkbox" name="{{form.duplicate_duals.name}}" id="{{form.duplicate_duals.id_for_label}}" data-toggle="toggle" />
+                <input type="checkbox" name="{{form.duplicate_duals.name}}" id="{{form.duplicate_duals.id_for_label}}" data-toggle="toggle">
                 <label for="{{form.duplicate_duals.id_for_label}}">Duplicate Dual Techs</label>
               </div>
 
               <input type="button" class="btn btn-outline-primary" id="char_rando_assignments_button" value="Limit Character Assignments" data-toggle="collapse" data-target="#character_selection_matrix" aria-expanded="false" aria-controls="character_selection_matrix">
 
               <div class="border border-secondary rounded p-2 mb-3 mt-3 collapse" id="character_selection_matrix">
-                <input type="hidden" name="{{form.char_rando_assignments.name}}" id="{{form.char_rando_assignments.id_for_label}}">
                 <p>Select which character identities can be assigned which character models:</p>
-                <div id="character_selection_error" class="errorText"></div>
+                <div id="character_selection_error" class="bg-danger"></div>
                 <table>
                   <tr>
                     <th></th>
@@ -45,8 +44,8 @@
                 {% endwith %}
                 </table>
                 <div class="pt-2">
-                  <input class="btn btn-outline-primary btn-sm" type="button" form="none" value="Check All" onclick="rcCheckAll()">
-                  <input class="btn btn-outline-primary btn-sm" type="button" form="none" value="Uncheck All" onclick="rcUncheckAll()">
+                  <input class="btn btn-outline-primary btn-sm" type="button" form="none" value="Check All" id="id_rc_check_all">
+                  <input class="btn btn-outline-primary btn-sm" type="button" form="none" value="Uncheck All" id="id_rc_uncheck_all">
                 </div>
               </div>
 
